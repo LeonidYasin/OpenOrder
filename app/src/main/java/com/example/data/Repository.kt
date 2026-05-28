@@ -1,8 +1,10 @@
 package com.example.data
 
 import com.example.domain.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import java.util.UUID
 
 class OrdenRepository(private val dao: OrdenDao) {
@@ -19,7 +21,7 @@ class OrdenRepository(private val dao: OrdenDao) {
     /**
      * Инициализация базовых демонстрационных данных при первом запуске
      */
-    suspend fun initializeSeedData() {
+    suspend fun initializeSeedData() = withContext(Dispatchers.IO) {
         val currentForks = dao.getAllForks().first()
         if (currentForks.isEmpty()) {
             // 1. Создание главного репозитория (ядро)
@@ -92,26 +94,33 @@ class OrdenRepository(private val dao: OrdenDao) {
     }
 
     /**
+     * РЕГИСТРАЦИЯ ХАРТИИ УЧАСТНИКА: Добавление нового реального или удаленного агента в СУБД.
+     */
+    suspend fun registerAgent(agent: AgentEntity) = withContext(Dispatchers.IO) {
+        dao.insertAgent(agent)
+    }
+
+    /**
      * ELECTION PROTOCOL: Голосование за Proposal
      * Автоматически обновляет репутационный вес и проверяет кворум.
      * «Код как закон»: Если голоса превышают кворум, Proposal принимается,
      * и триггер АВТОМАТИЧЕСКИ создает Административную задачу в Executive.
      */
-    suspend fun castVote(proposalId: String, voterId: String, votedYes: Boolean): String {
-        val proposal = dao.getProposalById(proposalId) ?: return "Решение не найдено"
-        if (proposal.status != "ACTIVE") return "Голосование уже закрыто"
+    suspend fun castVote(proposalId: String, voterId: String, votedYes: Boolean): String = withContext(Dispatchers.IO) {
+        val proposal = dao.getProposalById(proposalId) ?: return@withContext "Решение не найдено"
+        if (proposal.status != "ACTIVE") return@withContext "Голосование уже закрыто"
 
-        val voter = dao.getAgentById(voterId) ?: return "Агент не зарегистрирован"
+        val voter = dao.getAgentById(voterId) ?: return@withContext "Агент не зарегистрирован"
 
         // Проверим Сибил-барьер (например, минимальная репутация для голосования в ядре = 15.0)
         if (voter.reputationScore < 15.0) {
-            return "Отказ: Вес репутации (${voter.reputationScore}) ниже Сибил-порога (15.0)"
+            return@withContext "Отказ: Вес репутации (${voter.reputationScore}) ниже Сибил-порога (15.0)"
         }
 
         // Проверим, голосовал ли уже этот участник
         val existingVote = dao.getVoteByVoter(proposalId, voterId)
         if (existingVote != null) {
-            return "Вы уже проголосовали в этом повестке дня"
+            return@withContext "Вы уже проголосовали в этом повестке дня"
         }
 
         // Запись нового голоса
@@ -177,18 +186,18 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"proposalId\":\"$proposalId\",\"voter\":\"$voterId\",\"vote\":$votedYes,\"weight\":$voteRepWeight}"
         )
 
-        return logTriggerMessage
+        return@withContext logTriggerMessage
     }
 
     /**
      * COUNCIL : Создание нового предложения
      */
-    suspend fun createProposal(title: String, description: String, proposerId: String, forkId: String): String {
-        val proposer = dao.getAgentById(proposerId) ?: return "Автор не найден"
-        val fork = dao.getForkById(forkId) ?: return "Форк системы не существует"
+    suspend fun createProposal(title: String, description: String, proposerId: String, forkId: String): String = withContext(Dispatchers.IO) {
+        val proposer = dao.getAgentById(proposerId) ?: return@withContext "Автор не найден"
+        val fork = dao.getForkById(forkId) ?: return@withContext "Форк системы не существует"
         
         if (proposer.reputationScore < fork.minReputationToPropose) {
-            return "Недостаточно репутации для формирования повестки. Требуется: ${fork.minReputationToPropose}"
+            return@withContext "Недостаточно репутации для формирования повестки. Требуется: ${fork.minReputationToPropose}"
         }
 
         val propId = "prop-${UUID.randomUUID().toString().take(6)}"
@@ -223,7 +232,7 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"id\":\"$propId\",\"title\":\"$title\",\"proposer\":\"$proposerId\",\"forkId\":\"$forkId\"}"
         )
 
-        return "Предложение успешно вынесено на совет в рамках ветки '${fork.title}'!"
+        return@withContext "Предложение успешно вынесено на совет в рамках ветки '${fork.title}'!"
     }
 
     /**
@@ -231,11 +240,11 @@ class OrdenRepository(private val dao: OrdenDao) {
      * Реализует меритократический вклад: при завершении и аудите задачи участником,
      * узел начисляет ему репутацию (Reputation Score).
      */
-    suspend fun completeTask(taskId: String, agentId: String): String {
-        val task = dao.getTaskById(taskId) ?: return "Задача не найдена"
-        if (task.status == "COMPLETED" || task.status == "AUDITED") return "Задача уже завершена"
+    suspend fun completeTask(taskId: String, agentId: String): String = withContext(Dispatchers.IO) {
+        val task = dao.getTaskById(taskId) ?: return@withContext "Задача не найдена"
+        if (task.status == "COMPLETED" || task.status == "AUDITED") return@withContext "Задача уже завершена"
 
-        val agent = dao.getAgentById(agentId) ?: return "Агент не зарегистрирован"
+        val agent = dao.getAgentById(agentId) ?: return@withContext "Агент не зарегистрирован"
 
         // Обновим задачу
         val updatedTask = task.copy(
@@ -261,7 +270,7 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"taskId\":\"$taskId\",\"by\":\"$agentId\",\"reward\":${task.reputationReward}}"
         )
 
-        return "Вклад зафиксирован! Задача '${task.title}' закрыта. Агенту $agentId начислено +${task.reputationReward} репутации."
+        return@withContext "Вклад зафиксирован! Задача '${task.title}' закрыта. Агенту $agentId начислено +${task.reputationReward} репутации."
     }
 
     /**
@@ -269,7 +278,7 @@ class OrdenRepository(private val dao: OrdenDao) {
      * «Код как закон»: Жюри выбирается случайно из участников с высоким репутационным порогом
      * для исключения сговоров и обеспечения меритократической непредвзятости.
      */
-    suspend fun raiseDispute(plaintiffId: String, defendantId: String, description: String, article: String): String {
+    suspend fun raiseDispute(plaintiffId: String, defendantId: String, description: String, article: String): String = withContext(Dispatchers.IO) {
         val allAgents = dao.getAllAgents().first()
         // Отбираем кандидатов с высокой репутацией (>= 50.0), исключая участников спора
         val eligibleArbiters = allAgents.filter { 
@@ -277,7 +286,7 @@ class OrdenRepository(private val dao: OrdenDao) {
         }
 
         if (eligibleArbiters.size < 2) {
-            return "Ошибка: Недостаточно независимых арбитров с репутацией >= 50 для созыва судебной коллегии"
+            return@withContext "Ошибка: Недостаточно независимых арбитров с репутацией >= 50 для созыва судебной коллегии"
         }
 
         // Случайный выбор двух присяжных
@@ -305,19 +314,19 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"id\":\"$disputeId\",\"jury\":\"$juryString\"}"
         )
 
-        return "Спор зарегистрирован. Случайно созван независимый арбитраж: [${juryString.replace(",", ", ")}]"
+        return@withContext "Спор зарегистрирован. Случайно созван независимый арбитраж: [${juryString.replace(",", ", ")}]"
     }
 
     /**
      * JUDICIARY : Вещание голоса присяжного по иску
      */
-    suspend fun castJuryVote(disputeId: String, arbiterId: String, voteGuilty: Boolean): String {
-        val dispute = dao.getDisputeById(disputeId) ?: return "Спор не найден"
-        if (dispute.status != "REVIEW") return "Спор уже закрыт"
+    suspend fun castJuryVote(disputeId: String, arbiterId: String, voteGuilty: Boolean): String = withContext(Dispatchers.IO) {
+        val dispute = dao.getDisputeById(disputeId) ?: return@withContext "Спор не найден"
+        if (dispute.status != "REVIEW") return@withContext "Спор уже закрыт"
 
         val juryList = dispute.juryIds.split(",")
         if (!juryList.contains(arbiterId)) {
-            return "Вы не входите в утвержденную коллегию присяжных для этого иска"
+            return@withContext "Вы не входите в утвержденную коллегию присяжных для этого иска"
         }
 
         val updatedYes = if (voteGuilty) dispute.juryVotesYes + 1 else dispute.juryVotesYes
@@ -336,8 +345,8 @@ class OrdenRepository(private val dao: OrdenDao) {
                 // Штраф репутации подсудимому
                 val defendant = dao.getAgentById(dispute.defendantId)
                 if (defendant != null) {
-                    val penalizedRep = maxOf(10.0, defendant.reputationScore - 20.0)
-                    dao.insertAgent(defendant.copy(reputationScore = penalizedRep))
+                     val penalizedRep = maxOf(10.0, defendant.reputationScore - 20.0)
+                     dao.insertAgent(defendant.copy(reputationScore = penalizedRep))
                 }
             } else {
                 newStatus = "RESOLVED_NO"
@@ -362,15 +371,15 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"disputeId\":\"$disputeId\",\"arbiter\":\"$arbiterId\",\"voteGuilty\":$voteGuilty}"
         )
 
-        return "Ваш закрытый голос внесен в реестр судебного прецедента."
+        return@withContext "Ваш закрытый голос внесен в реестр судебного прецедента."
     }
 
     /**
      * REPOSITORY / FORK: Ветвление системы (создание форка)
      */
-    suspend fun createFork(id: String, parentId: String, title: String, description: String, quorumMult: Double, minPropRep: Double): String {
+    suspend fun createFork(id: String, parentId: String, title: String, description: String, quorumMult: Double, minPropRep: Double): String = withContext(Dispatchers.IO) {
         val existing = dao.getForkById(id)
-        if (existing != null) return "Ветка с идентификатором '$id' уже зарегистрирована в реестре"
+        if (existing != null) return@withContext "Ветка с идентификатором '$id' уже зарегистрирована в реестре"
 
         val newFork = ForkEntity(
             id = id,
@@ -390,13 +399,13 @@ class OrdenRepository(private val dao: OrdenDao) {
             payload = "{\"id\":\"$id\",\"title\":\"$title\",\"parent\":\"$parentId\"}"
         )
 
-        return "Успешно форкнуто! Ветка '$title' создана. Вы можете разрабатывать в ней новые институты, регулируя кворум и барьеры голосования."
+        return@withContext "Успешно форкнуто! Ветка '$title' создана. Вы можете разрабатывать в ней новые институты, регулируя кворум и барьеры голосования."
     }
 
     /**
      * Симуляция P2P записи лога в базу
      */
-    private suspend fun simulateP2PSyncLog(direction: String, actionType: String, payload: String) {
+    private suspend fun simulateP2PSyncLog(direction: String, actionType: String, payload: String) = withContext(Dispatchers.IO) {
         val envelope = P2PEnvelope(
             senderId = "node-local@orden.p2p",
             recipientId = "overlay-network@orden.p2p",
@@ -418,9 +427,162 @@ class OrdenRepository(private val dao: OrdenDao) {
     }
 
     /**
+     * РЕАЛЬНЫЙ ТРАНСПОРТ: Анализ и применение входящего SMTP/IMAP сообщения P2P в локальную СУБД.
+     */
+    suspend fun processIncomingMailEnvelope(envelopeBody: String): String = withContext(Dispatchers.IO) {
+        try {
+            val lines = envelopeBody.split("\n", "\r")
+            var senderId = ""
+            var actionType = ""
+            var forkId = "core"
+            var payload = ""
+            var isPayload = false
+
+            for (line in lines) {
+                val trimmed = line.trim()
+                if (trimmed.startsWith("SENDER:")) senderId = trimmed.substringAfter("SENDER:").trim()
+                else if (trimmed.startsWith("TYPE:")) actionType = trimmed.substringAfter("TYPE:").trim()
+                else if (trimmed.startsWith("FORK:")) forkId = trimmed.substringAfter("FORK:").trim()
+                else if (trimmed.startsWith("PAYLOAD:")) {
+                    isPayload = true
+                    continue
+                } else if (trimmed == "===END-ORDEN-DATA===") {
+                    isPayload = false
+                } else if (isPayload) {
+                    payload += trimmed
+                }
+            }
+
+            if (senderId.isBlank() || actionType.isBlank()) {
+                return@withContext "Ошибка P2P разбора: заголовок пуст."
+            }
+
+            // Добавим лог получения
+            dao.insertSyncLog(
+                SyncLogEntity(
+                    timestamp = System.currentTimeMillis(),
+                    direction = "IMAP_REC",
+                    mailEnvelope = envelopeBody,
+                    statusUrl = "CONVERGED_REAL (CRDT Decrypted)",
+                    messageHash = "SHA256-" + UUID.randomUUID().toString().take(8).uppercase()
+                )
+            )
+
+            // Проверим, зарегистрирован ли отправитель как Агент. Если нет — временно внесем с базовыми параметрами
+            val existingAgent = dao.getAgentById(senderId)
+            if (existingAgent == null) {
+                dao.insertAgent(
+                    AgentEntity(
+                        id = senderId,
+                        name = senderId.substringBefore("@"),
+                        role = "Adept",
+                        reputationScore = 20.0,
+                        contributionsCount = 0,
+                        publicKey = "0xP2P_TEMP_" + UUID.randomUUID().toString().take(8).uppercase()
+                    )
+                )
+            }
+
+            fun extractVal(json: String, key: String): String {
+                val pattern = """"$key"\s*:\s*"?([^",}]+)"?""".toRegex()
+                val match = pattern.find(json) ?: return ""
+                return if (match.groupValues.size > 1) match.groupValues[1].trim() else ""
+            }
+
+            when (actionType) {
+                "NEW_PROPOSAL" -> {
+                    val pId = extractVal(payload, "id")
+                    val pTitle = extractVal(payload, "title").ifBlank { "С SMTP канала" }
+                    val proposer = extractVal(payload, "proposer").ifBlank { senderId }
+                    val fId = extractVal(payload, "forkId").ifBlank { forkId }
+                    val pDesc = extractVal(payload, "description").ifBlank { "SMTP Синхронизированный закон" }
+                    
+                    if (dao.getProposalById(pId) == null) {
+                        dao.insertProposal(
+                            ProposalEntity(
+                                id = pId,
+                                title = pTitle,
+                                description = "$pDesc\n[Получено по зашифрованному реле SMTP от: $senderId]",
+                                proposerId = proposer,
+                                status = "ACTIVE",
+                                voteYesRep = 20.0,
+                                voteNoRep = 0.0,
+                                quorumRequired = 100.0,
+                                createdAt = System.currentTimeMillis(),
+                                forkId = fId
+                            )
+                        )
+                        return@withContext "Импортировано новое предложение [$pId] '$pTitle'"
+                    }
+                }
+                "CAST_VOTE" -> {
+                    val propId = extractVal(payload, "proposalId")
+                    val voter = extractVal(payload, "voter").ifBlank { senderId }
+                    val voteStr = extractVal(payload, "vote")
+                    val votedYes = voteStr.toBoolean()
+
+                    val p = dao.getProposalById(propId)
+                    val v = dao.getAgentById(voter)
+                    if (p != null && v != null) {
+                        val existingVote = dao.getVoteByVoter(propId, voter)
+                        if (existingVote == null) {
+                            val repWeight = v.reputationScore
+                            dao.insertVote(
+                                VoteEntity(
+                                    proposalId = propId,
+                                    voterId = voter,
+                                    votedYes = votedYes,
+                                    voterReputation = repWeight,
+                                    timestamp = System.currentTimeMillis()
+                                )
+                            )
+                            val updatedYes = if (votedYes) p.voteYesRep + repWeight else p.voteYesRep
+                            val updatedNo = if (!votedYes) p.voteNoRep + repWeight else p.voteNoRep
+                            dao.insertProposal(
+                                p.copy(
+                                    voteYesRep = updatedYes,
+                                    voteNoRep = updatedNo
+                                )
+                            )
+                            return@withContext "Учтен входящий SMTP P2P голос от пира $voter за повестку $propId"
+                        }
+                    }
+                }
+                "TASK_COMPLETED" -> {
+                    val tId = extractVal(payload, "taskId")
+                    val byAgent = extractVal(payload, "by").ifBlank { senderId }
+                    val task = dao.getTaskById(tId)
+                    if (task != null && task.status != "COMPLETED" && task.status != "AUDITED") {
+                        dao.insertTask(
+                            task.copy(
+                                assignedTo = byAgent,
+                                status = "AUDITED",
+                                completedAt = System.currentTimeMillis()
+                            )
+                        )
+                        val ag = dao.getAgentById(byAgent)
+                        if (ag != null) {
+                            dao.insertAgent(
+                                ag.copy(
+                                    reputationScore = ag.reputationScore + task.reputationReward,
+                                    contributionsCount = ag.contributionsCount + 1
+                                )
+                            )
+                        }
+                        return@withContext "Зафиксировано SMTP выполнение задачи [$tId] агентом $byAgent"
+                    }
+                }
+            }
+            return@withContext "Данные P2P проверены, изменений не требуется или объект устарел."
+        } catch (e: Exception) {
+            return@withContext "Ошибка SMTP/IMAP интеграции: ${e.message}"
+        }
+    }
+
+    /**
      * Принудительная симуляция входящей SMTP/IMAP синхронизации с другими пирами Ордена
      */
-    suspend fun triggerNetworkSyncDemo(): String {
+    suspend fun triggerNetworkSyncDemo(): String = withContext(Dispatchers.IO) {
         // Симулируем, что получили из внешнего почтового ящика IMAP действия от другого участника
         val randomNum = (1..3).random()
         val peerMail = when(randomNum) {
@@ -454,9 +616,9 @@ class OrdenRepository(private val dao: OrdenDao) {
         // Для демонстрационных целей, если это был голос Александра за главный proposal, учтем его в реальной State:
         if (randomNum == 1) {
             castVote("prop-const-1", "alex@orden.p2p", true)
-            return "Синхронизация IMAP завершена. Получен голос от Александра за 'Принятие Хартии'. Накат состояния успешен!"
+            return@withContext "Синхронизация IMAP завершена. Получен голос от Александра за 'Принятие Хартии'. Накат состояния успешен!"
         }
 
-        return "Синхронизация IMAP завершена. Получено внешнее событие P2P. Накат состояния завершен без конфликтов!"
+        return@withContext "Синхронизация IMAP завершена. Получено внешнее событие P2P. Накат состояния завершен без конфликтов!"
     }
 }

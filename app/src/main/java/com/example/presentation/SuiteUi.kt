@@ -52,6 +52,7 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
     val consoleOutput by viewModel.consoleOutput.collectAsState()
 
     var activeTab by remember { mutableStateOf(0) } // 0: Идеология, 1: Совет & Управа, 2: Суд, 3: Форки & Сеть
+    var showRegisterDialog by remember { mutableStateOf(false) }
 
     val currentAgent = agents.find { it.id == currentAgentId }
     val currentFork = forks.find { it.id == selectedForkId }
@@ -243,6 +244,25 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                                         }
                                     )
                                 }
+                                HorizontalDivider(color = TextMuted.copy(alpha = 0.3f))
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                Icons.Default.Add,
+                                                "Add icon",
+                                                tint = HighContrastGold,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Вступить/Регистрация", color = HighContrastGold, fontWeight = FontWeight.Bold)
+                                        }
+                                    },
+                                    onClick = {
+                                        showRegisterDialog = true
+                                        expanded = false
+                                    }
+                                )
                             }
                         }
 
@@ -299,8 +319,231 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                     0 -> ArchitectureTab()
                     1 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId)
                     2 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId)
-                    3 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId)
+                    3 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents)
                 }
+            }
+
+            if (showRegisterDialog) {
+                var regId by remember { mutableStateOf("") }
+                var regName by remember { mutableStateOf("") }
+                var regRole by remember { mutableStateOf("Knight") }
+                val roles = listOf("Adept", "Knight", "Arbiter", "Scribe", "Grandmaster")
+                var regRoleExpanded by remember { mutableStateOf(false) }
+                var regInitialRep by remember { mutableStateOf(20f) }
+                var regAutoLogin by remember { mutableStateOf(true) }
+                var regCustomPubKey by remember { mutableStateOf("") }
+
+                LaunchedEffect(showRegisterDialog) {
+                    if (showRegisterDialog) {
+                        regId = ""
+                        regName = ""
+                        regCustomPubKey = "0x" + UUID.randomUUID().toString().replace("-", "").take(16).uppercase()
+                        regInitialRep = 20f
+                    }
+                }
+
+                AlertDialog(
+                    onDismissRequest = { showRegisterDialog = false },
+                    title = {
+                        Column {
+                            Text(
+                                text = "ВСТУПИТЬ В ОТКРЫТЫЙ ОРДЕН",
+                                color = HighContrastGold,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 18.sp
+                            )
+                            Text(
+                                text = "Создание децентрализованного манифеста и ключей доступа",
+                                color = TextMuted,
+                                fontSize = 12.sp
+                            )
+                        }
+                    },
+                    text = {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = regId,
+                                onValueChange = { regId = it },
+                                label = { Text("P2P ID (например, user@orden.p2p)") },
+                                placeholder = { Text("id@orden.p2p") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentTeal,
+                                    focusedLabelColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted,
+                                    unfocusedLabelColor = TextMuted,
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("reg_id_input"),
+                                singleLine = true
+                            )
+
+                            OutlinedTextField(
+                                value = regName,
+                                onValueChange = { regName = it },
+                                label = { Text("Имя / Псевдоним") },
+                                placeholder = { Text("Антон") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentTeal,
+                                    focusedLabelColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted,
+                                    unfocusedLabelColor = TextMuted,
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("reg_name_input"),
+                                singleLine = true
+                            )
+
+                            // Role selector Dropdown
+                            Box(modifier = Modifier.fillMaxWidth()) {
+                                OutlinedTextField(
+                                    value = when (regRole) {
+                                        "Grandmaster" -> "Грандмастер (Grandmaster)"
+                                        "Knight" -> "Рыцарь (Knight)"
+                                        "Arbiter" -> "Арбитр (Arbiter)"
+                                        "Scribe" -> "Писец (Scribe)"
+                                        else -> "Адепт (Adept)"
+                                    },
+                                    onValueChange = {},
+                                    readOnly = true,
+                                    label = { Text("Выбор Орденской Роли") },
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = AccentTeal,
+                                        focusedLabelColor = AccentTeal,
+                                        unfocusedBorderColor = TextMuted,
+                                        unfocusedLabelColor = TextMuted,
+                                        focusedTextColor = TextLight,
+                                        unfocusedTextColor = TextLight
+                                    ),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { regRoleExpanded = true },
+                                    trailingIcon = {
+                                        IconButton(onClick = { regRoleExpanded = true }) {
+                                            Icon(Icons.Default.ArrowDropDown, "Select Role", tint = AccentTeal)
+                                        }
+                                    }
+                                )
+                                DropdownMenu(
+                                    expanded = regRoleExpanded,
+                                    onDismissRequest = { regRoleExpanded = false },
+                                    modifier = Modifier.background(CosmicGray).fillMaxWidth(0.8f)
+                                ) {
+                                    roles.forEach { r ->
+                                        val rName = when (r) {
+                                            "Grandmaster" -> "Грандмастер"
+                                            "Knight" -> "Рыцарь"
+                                            "Arbiter" -> "Арбитр"
+                                            "Scribe" -> "Писец"
+                                            else -> "Адепт"
+                                        }
+                                        DropdownMenuItem(
+                                            text = { Text("$rName ($r)", color = TextLight) },
+                                            onClick = {
+                                                regRole = r
+                                                regRoleExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Pub key display
+                            OutlinedTextField(
+                                value = regCustomPubKey,
+                                onValueChange = { regCustomPubKey = it },
+                                label = { Text("Ed25519 Публичный ключ (генерируется)") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentTeal,
+                                    focusedLabelColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted,
+                                    unfocusedLabelColor = TextMuted,
+                                    focusedTextColor = TextMuted,
+                                    unfocusedTextColor = TextMuted
+                                ),
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                trailingIcon = {
+                                    IconButton(onClick = {
+                                        regCustomPubKey = "0x" + UUID.randomUUID().toString().replace("-", "").take(16).uppercase()
+                                    }) {
+                                        Icon(Icons.Default.Refresh, "Re-generate key", tint = AccentTeal)
+                                    }
+                                }
+                            )
+
+                            // Initial Reputation
+                            Column {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Стартовая репутация:", color = TextLight, fontSize = 12.sp)
+                                    Text("${regInitialRep.toInt()} REP", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                }
+                                Slider(
+                                    value = regInitialRep,
+                                    onValueChange = { regInitialRep = it },
+                                    valueRange = 10f..100f,
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = AccentTeal,
+                                        activeTrackColor = AccentTeal,
+                                        inactiveTrackColor = TextMuted.copy(alpha = 0.3f)
+                                    )
+                                )
+                            }
+
+                            // Auto login checkbox
+                            Row(
+                                modifier = Modifier.fillMaxWidth().clickable { regAutoLogin = !regAutoLogin },
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = regAutoLogin,
+                                    onCheckedChange = { regAutoLogin = it },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = AccentTeal,
+                                        uncheckedColor = TextMuted
+                                    )
+                                )
+                                Text("Автоматически войти под этой сессией", color = TextLight, fontSize = 13.sp)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (regName.isBlank() || regId.isBlank()) return@Button
+                                val finalId = if (regId.contains("@")) regId else "${regId.trim()}@orden.p2p"
+                                viewModel.registerAgent(
+                                    id = finalId,
+                                    name = regName.trim(),
+                                    role = regRole,
+                                    initialRep = regInitialRep.toDouble(),
+                                    customPubKey = regCustomPubKey,
+                                    autoLogin = regAutoLogin
+                                )
+                                showRegisterDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark)
+                        ) {
+                            Text("ВСТУПИТЬ В ОРДЕН", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showRegisterDialog = false }) {
+                            Text("ОТМЕНА", color = TextMuted)
+                        }
+                    },
+                    containerColor = CosmicGray,
+                    tonalElevation = 8.dp
+                )
             }
         }
     }
@@ -1146,7 +1389,8 @@ fun RepositoryForksTab(
     viewModel: SuiteViewModel,
     forks: List<ForkEntity>,
     syncLogs: List<SyncLogEntity>,
-    selectedForkId: String
+    selectedForkId: String,
+    agents: List<AgentEntity>
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var forkIdInput by remember { mutableStateOf("") }
@@ -1155,7 +1399,352 @@ fun RepositoryForksTab(
     var quorumMult by remember { mutableStateOf(1.0f) }
     var minRepThreshold by remember { mutableStateOf(10.0f) }
 
+    // Participant invite / import state
+    var peerShareInput by remember { mutableStateOf("") }
+    var importedFeedback by remember { mutableStateOf("") }
+
+    val activeSmtpHost by viewModel.smtpHost.collectAsState()
+    val activeSmtpPort by viewModel.smtpPort.collectAsState()
+    val activeImapHost by viewModel.imapHost.collectAsState()
+    val activeImapPort by viewModel.imapPort.collectAsState()
+    val activeMailUser by viewModel.mailUser.collectAsState()
+    val activeMailPass by viewModel.mailPass.collectAsState()
+    val activeUseSsl by viewModel.useSsl.collectAsState()
+
+    var smtpHostInput by remember(activeSmtpHost) { mutableStateOf(activeSmtpHost) }
+    var smtpPortInput by remember(activeSmtpPort) { mutableStateOf(activeSmtpPort.toString()) }
+    var imapHostInput by remember(activeImapHost) { mutableStateOf(activeImapHost) }
+    var imapPortInput by remember(activeImapPort) { mutableStateOf(activeImapPort.toString()) }
+    var mailUserInput by remember(activeMailUser) { mutableStateOf(activeMailUser) }
+    var mailPassInput by remember(activeMailPass) { mutableStateOf(activeMailPass) }
+    var useSslInput by remember(activeUseSsl) { mutableStateOf(activeUseSsl) }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                border = BorderStroke(1.dp, HighContrastGold.copy(0.3f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        "РЕКРУТИНГ И ПРИГЛАШЕНИЯ (P2P ONBOARDING)",
+                        color = HighContrastGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        "Отправьте инвайт новому участнику или вставьте его инвайт ниже для занесения в защищенную СУБД узла.",
+                        color = TextLight,
+                        fontSize = 12.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Import row
+                    OutlinedTextField(
+                        value = peerShareInput,
+                        onValueChange = { peerShareInput = it },
+                        label = { Text("Код приглашения участника", color = TextMuted) },
+                        placeholder = { Text("Вставьте код формата RECRUIT_JOIN#...") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = TextLight,
+                            unfocusedTextColor = TextLight,
+                            focusedBorderColor = AccentTeal,
+                            unfocusedBorderColor = TextMuted
+                        ),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("invite_importer_input"),
+                        singleLine = true
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = {
+                                val text = peerShareInput.trim()
+                                if (text.startsWith("RECRUIT_JOIN#")) {
+                                    try {
+                                        val parts = text.removePrefix("RECRUIT_JOIN#").split("|")
+                                        if (parts.size >= 4) {
+                                            val id = parts[0]
+                                            val name = parts[1]
+                                            val role = parts[2]
+                                            val rep = parts[3].toDoubleOrNull() ?: 20.0
+                                            val key = if (parts.size > 4) parts[4] else ""
+                                            viewModel.registerAgent(id, name, role, rep, key, autoLogin = false)
+                                            importedFeedback = "Успешно импортирован участник: $name ($id)!"
+                                            peerShareInput = ""
+                                        } else {
+                                            importedFeedback = "Ошибка разбора: неверный формат полей"
+                                        }
+                                    } catch (e: Exception) {
+                                        importedFeedback = "Ошибка импорта: ${e.message}"
+                                    }
+                                } else {
+                                    importedFeedback = "Ошибка: код должен начинаться с RECRUIT_JOIN#"
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.weight(1f).testTag("import_peer_btn")
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Внести пира", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = {
+                                val currentAgent = agents.find { it.id == viewModel.currentAgentId.value }
+                                if (currentAgent != null) {
+                                    val inviteCode = "RECRUIT_JOIN#${currentAgent.id}|${currentAgent.name}|${currentAgent.role}|${currentAgent.reputationScore}|${currentAgent.publicKey}"
+                                    try {
+                                        val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("OpenOrdenInvite", inviteCode)
+                                        clipboard.setPrimaryClip(clip)
+                                        importedFeedback = "Ваш инвайт-код скопирован в буфер! Передайте его новому участнику боевой системы."
+                                    } catch (e: Exception) {
+                                        importedFeedback = "Ошибка буфера: ${e.message}. Код: $inviteCode"
+                                    }
+                                } else {
+                                    importedFeedback = "Сначала выберите или зарегистрируйте свой аккаунт!"
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = HighContrastGold),
+                            border = BorderStroke(1.dp, HighContrastGold),
+                            shape = RoundedCornerShape(4.dp),
+                            modifier = Modifier.weight(1f).testTag("copy_my_invite_btn")
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = HighContrastGold)
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Поделиться собой", fontSize = 11.sp, color = HighContrastGold)
+                        }
+                    }
+
+                    if (importedFeedback.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = importedFeedback,
+                            color = CyberGreen,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            var showSettings by remember { mutableStateOf(false) }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                border = BorderStroke(1.dp, AccentTeal.copy(0.4f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = AccentTeal, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "НАСТРОЙКИ РЕАЛЬНОГО P2P SMTP / IMAP КАНАЛА",
+                                color = AccentTeal,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace
+                            )
+                        }
+                        TextButton(
+                            onClick = { showSettings = !showSettings },
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Text(
+                                text = if (showSettings) "Скрыть" else "Настроить",
+                                color = HighContrastGold,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+
+                    if (showSettings) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Для связи вне цензуры на реальных SMTP/IMAP серверах, укажите параметры своего почтового ящика ниже. Рекомендуется использовать специальный пароль приложения (App Password).",
+                            color = TextLight,
+                            fontSize = 11.sp
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Host Row SMTP
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = smtpHostInput,
+                                onValueChange = { smtpHostInput = it },
+                                label = { Text("SMTP Хост", color = TextMuted) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight,
+                                    focusedBorderColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted
+                                ),
+                                modifier = Modifier.weight(2f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = smtpPortInput,
+                                onValueChange = { smtpPortInput = it },
+                                label = { Text("Порт", color = TextMuted) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight,
+                                    focusedBorderColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted
+                                ),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Host Row IMAP
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = imapHostInput,
+                                onValueChange = { imapHostInput = it },
+                                label = { Text("IMAP Хост", color = TextMuted) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight,
+                                    focusedBorderColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted
+                                ),
+                                modifier = Modifier.weight(2f),
+                                singleLine = true
+                            )
+                            OutlinedTextField(
+                                value = imapPortInput,
+                                onValueChange = { imapPortInput = it },
+                                label = { Text("Порт", color = TextMuted) },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight,
+                                    focusedBorderColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted
+                                ),
+                                modifier = Modifier.weight(1f),
+                                singleLine = true
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // Credentials
+                        OutlinedTextField(
+                            value = mailUserInput,
+                            onValueChange = { mailUserInput = it },
+                            label = { Text("Email (Адрес ноды)", color = TextMuted) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextLight,
+                                unfocusedTextColor = TextLight,
+                                focusedBorderColor = AccentTeal,
+                                unfocusedBorderColor = TextMuted
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = mailPassInput,
+                            onValueChange = { mailPassInput = it },
+                            label = { Text("Пароль / Пароль приложения", color = TextMuted) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = TextLight,
+                                unfocusedTextColor = TextLight,
+                                focusedBorderColor = AccentTeal,
+                                unfocusedBorderColor = TextMuted
+                            ),
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation()
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // SSL use checkbox
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Checkbox(
+                                checked = useSslInput,
+                                onCheckedChange = { useSslInput = it },
+                                colors = CheckboxDefaults.colors(checkedColor = AccentTeal)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Использовать SSL/TLS шифрование транспортного уровня", color = TextLight, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Button(
+                                onClick = {
+                                    viewModel.updateMailSettings(
+                                        smtpH = smtpHostInput.trim(),
+                                        smtpP = smtpPortInput.trim().toIntOrNull() ?: 465,
+                                        imapH = imapHostInput.trim(),
+                                        imapP = imapPortInput.trim().toIntOrNull() ?: 993,
+                                        usr = mailUserInput.trim(),
+                                        pas = mailPassInput,
+                                        ssl = useSslInput
+                                    )
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Сохранить", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+
+                            Button(
+                                onClick = {
+                                    viewModel.testMailConnection()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = HighContrastGold),
+                                border = BorderStroke(1.dp, HighContrastGold),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("Проверить линк", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = HighContrastGold)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1399,7 +1988,7 @@ fun RepositoryForksTab(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    Text("Множитель Кворума: x${String.format("%.1f", quorumMult)}", color = TextLight, fontSize = 12.sp)
+                    Text("Множитель Кворума: x${String.format(java.util.Locale.US, "%.1f", quorumMult)}", color = TextLight, fontSize = 12.sp)
                     Slider(
                         value = quorumMult,
                         onValueChange = { quorumMult = it },

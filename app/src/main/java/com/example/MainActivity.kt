@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                OpenOrderSocialOSApp(viewModel = viewModel)
+                 OpenOrderSocialOSApp(viewModel = viewModel)
             }
         }
     }
