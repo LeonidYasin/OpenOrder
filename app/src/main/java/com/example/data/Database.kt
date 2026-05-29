@@ -166,7 +166,25 @@ interface OrdenDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSyncLog(log: SyncLogEntity)
+
+    // Chat messages
+    @Query("SELECT * FROM chat_messages ORDER BY timestamp ASC")
+    fun getAllChatMessages(): Flow<List<ChatMessageEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertChatMessage(message: ChatMessageEntity)
 }
+
+// 8. P2P Chat Message Entity
+@Entity(tableName = "chat_messages")
+data class ChatMessageEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val senderId: String,
+    val recipientId: String,
+    val messageText: String,
+    val timestamp: Long,
+    val isSystem: Boolean = false
+)
 
 @Database(
     entities = [
@@ -176,9 +194,10 @@ interface OrdenDao {
         TaskEntity::class,
         DisputeEntity::class,
         ForkEntity::class,
-        SyncLogEntity::class
+        SyncLogEntity::class,
+        ChatMessageEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class OrdenDatabase : RoomDatabase() {

@@ -57,6 +57,15 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     private val _showOnboarding = MutableStateFlow(prefs.getBoolean("show_onboarding_welcome", true))
     val showOnboarding = _showOnboarding.asStateFlow()
 
+    private val _isSimulationEnabled = MutableStateFlow(prefs.getBoolean("is_simulation_enabled", true))
+    val isSimulationEnabled = _isSimulationEnabled.asStateFlow()
+
+    fun setSimulationEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean("is_simulation_enabled", enabled).apply()
+        _isSimulationEnabled.value = enabled
+        writeConsole("Симуляция сети: ${if (enabled) "ВКЛЮЧЕНА (демо-режим автоматизирован)" else "ВЫКЛЮЧЕНА (только РЕАЛЬНЫЕ SMTP/IMAP запросы)"}")
+    }
+
     fun dismissOnboarding() {
         prefs.edit().putBoolean("show_onboarding_welcome", false).apply()
         _showOnboarding.value = false
@@ -183,6 +192,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     val syncLogs: StateFlow<List<SyncLogEntity>> = repository.getSyncLogs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val chatMessages: StateFlow<List<ChatMessageEntity>> = repository.getChatMessages()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Selected fork ID & selected Actor perspective
     private val _selectedForkId = MutableStateFlow("core")
     val selectedForkId: StateFlow<String> = _selectedForkId.asStateFlow()
@@ -249,11 +261,23 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
                 _currentAgentId.value = cleanId
                 writeConsole("Сессия переключена на нового участника: $cleanId")
             }
+
+            showToast("Успешно зарегистрировано! Вы вошли как ${newAgent.name}", android.widget.Toast.LENGTH_LONG)
         }
     }
 
     fun writeConsole(message: String) {
         _consoleOutput.value = ">> $message\n${_consoleOutput.value.take(400)}"
+    }
+
+    fun showToast(message: String, duration: Int = android.widget.Toast.LENGTH_SHORT) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            try {
+                android.widget.Toast.makeText(getApplication(), message, duration).show()
+            } catch (e: Exception) {
+                // Safeguard against any background context toast crashes
+            }
+        }
     }
 
     // Interactive operations
@@ -266,6 +290,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
                 
                 prefs.edit().putBoolean("mission_voted", true).apply()
                 _missionVoted.value = true
+                showToast("Голос успешно учтен!")
+            } else {
+                showToast(response)
             }
         }
     }
@@ -273,6 +300,7 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     fun createProposal(title: String, description: String) {
         if (title.isBlank() || description.isBlank()) {
             writeConsole("Ошибка: название и описание предложения не могут быть пустыми")
+            showToast("Ошибка: заполните поля!")
             return
         }
         viewModelScope.launch {
@@ -284,6 +312,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
                     _selectedForkId.value, 
                     "{\"id\":\"prop-${java.util.UUID.randomUUID().toString().take(6)}\",\"title\":\"$title\",\"proposer\":\"${_currentAgentId.value}\",\"forkId\":\"${_selectedForkId.value}\",\"description\":\"$description\"}"
                 )
+                showToast("Предложение опубликовано!")
+            } else {
+                showToast(response)
             }
         }
     }
@@ -294,6 +325,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
             writeConsole(response)
             if (response.contains("зафиксирован") || response.contains("успешно")) {
                 broadcastToPeers("TASK_COMPLETED", _selectedForkId.value, "{\"taskId\":\"$taskId\",\"by\":\"${_currentAgentId.value}\"}")
+                showToast("Задача успешно выполнена!")
+            } else {
+                showToast(response)
             }
         }
     }
@@ -301,11 +335,17 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     fun raiseDispute(defendantId: String, description: String, article: String) {
         if (defendantId == _currentAgentId.value) {
             writeConsole("Ошибка: Вы не можете заявить конституционный dispute против самого себя!")
+            showToast("Нельзя подать иск на самого себя!")
             return
         }
         viewModelScope.launch {
             val response = repository.raiseDispute(_currentAgentId.value, defendantId, description, article)
             writeConsole(response)
+            if (response.contains("создан") || response.contains("успешно") || response.contains("Зафиксирован")) {
+                showToast("Конституционный иск подан!")
+            } else {
+                showToast(response)
+            }
         }
     }
 
@@ -316,6 +356,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
             if (response.contains("успешно") || response.contains("принят") || response.contains("Голос")) {
                 prefs.edit().putBoolean("mission_dispute", true).apply()
                 _missionDispute.value = true
+                showToast("Ваш вердикт присяжного подан!")
+            } else {
+                showToast(response)
             }
         }
     }
@@ -324,6 +367,7 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
         val cleanForkId = forkId.trim().lowercase().replace(" ", "-")
         if (cleanForkId.isEmpty() || title.isBlank()) {
             writeConsole("Ошибка: Обязательные параметры форка не заполнены")
+            showToast("Ошибка: заполните поля!")
             return
         }
         viewModelScope.launch {
@@ -336,7 +380,34 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
                 minPropRep = minPropRep
             )
             writeConsole(response)
-            _selectedForkId.value = cleanForkId // Переключим на созданный форк автоматически!
+            if (response.contains("успешно") || response.contains("создан")) {
+                _selectedForkId.value = cleanForkId // Переключим на созданный форк автоматически!
+                showToast("Мирофорк успешно создан!")
+            } else {
+                showToast(response)
+            }
+        }
+    }
+
+    fun sendChatMessage(recipientId: String, text: String) {
+        if (text.isBlank()) return
+        val sender = _currentAgentId.value
+        val timestamp = System.currentTimeMillis()
+        viewModelScope.launch {
+            // Save locally
+            val msg = ChatMessageEntity(
+                senderId = sender,
+                recipientId = recipientId,
+                messageText = text,
+                timestamp = timestamp
+            )
+            repository.insertChatMessage(msg)
+            writeConsole("Отправлено P2P сообщение для $recipientId: '$text'")
+
+            // Broadcast via SMTP!
+            val payload = "{\\\"text\\\":\\\"$text\\\",\\\"recipientId\\\":\\\"$recipientId\\\"}"
+            broadcastToPeers("CHAT_MESSAGE", "core", payload)
+            showToast("Сообщение отправлено по P2P SMTP!")
         }
     }
 
@@ -347,31 +418,47 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
         val settings = getMailSettings()
         if (settings.user.isBlank() || settings.pass.isBlank()) {
             viewModelScope.launch {
-                writeConsole("Параметры P2P SMTP/IMAP узла полупусты. Запуск симуляции демо-оверлея...")
-                val response = repository.triggerNetworkSyncDemo()
-                writeConsole(response)
+                if (_isSimulationEnabled.value) {
+                    writeConsole("Параметры P2P SMTP/IMAP узла полупусты. Запуск симуляции демо-оверлея...")
+                    val response = repository.triggerNetworkSyncDemo()
+                    writeConsole(response)
+                    showToast("Синхронизация завершена (Локальная симуляция)!")
+                } else {
+                    writeConsole("Ошибка P2P: Почтовый ящик не настроен. Настройте SMTP/IMAP для работы без симуляции.")
+                    showToast("Синхронизация отклонена: настройте SMTP/IMAP")
+                }
             }
             return
         }
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            writeConsole("Запуск РЕАЛЬНОГО опроса P2P IMAP ящика ${settings.user}...")
-            val fetchResult = MailTransport.fetchUnreadP2PMessages(settings)
-            if (fetchResult.isSuccess) {
-                val envelopes = fetchResult.getOrDefault(emptyList())
-                writeConsole("Успешно опрошен IMAP сервер. Извлечено P2P писем: ${envelopes.size}")
-                if (envelopes.isEmpty()) {
-                    writeConsole("Новых P2P транзакций открытых повесток дня в почтовом оверлее не найдено.")
+        viewModelScope.launch {
+            showToast("Запуск P2P синхронизации...")
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                writeConsole("Запуск РЕАЛЬНОГО опроса P2P IMAP ящика ${settings.user}...")
+                val fetchResult = MailTransport.fetchUnreadP2PMessages(settings)
+                if (fetchResult.isSuccess) {
+                    val envelopes = fetchResult.getOrDefault(emptyList())
+                    writeConsole("Успешно опрошен IMAP сервер. Извлечено P2P писем: ${envelopes.size}")
+                    if (envelopes.isEmpty()) {
+                        writeConsole("Новых P2P транзакций открытых повесток дня в почтовом оверлее не найдено.")
+                    } else {
+                        for (env in envelopes) {
+                            val mergeResult = repository.processIncomingMailEnvelope(env)
+                            writeConsole(mergeResult)
+                        }
+                    }
+                    showToast("Реальная P2P синхронизация завершена!")
                 } else {
-                    for (env in envelopes) {
-                        val mergeResult = repository.processIncomingMailEnvelope(env)
-                        writeConsole(mergeResult)
+                    writeConsole("Внимание: Сбой опроса IMAP почты: ${fetchResult.exceptionOrNull()?.message}")
+                    if (_isSimulationEnabled.value) {
+                        writeConsole("Откат на локальную симуляцию оверлея...")
+                        val response = repository.triggerNetworkSyncDemo()
+                        writeConsole(response)
+                        showToast("Сбой опроса. Выполнена демо-симуляция.")
+                    } else {
+                        writeConsole("Ошибка P2P: Чтение почтового ящика завершилось сбоем. Симуляция отключена.")
+                        showToast("Ошибка P2P опроса!")
                     }
                 }
-            } else {
-                writeConsole("Внимание: Сбой опроса IMAP почты: ${fetchResult.exceptionOrNull()?.message}")
-                writeConsole("Откат на локальную симуляцию оверлея...")
-                val response = repository.triggerNetworkSyncDemo()
-                writeConsole(response)
             }
         }
     }

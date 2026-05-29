@@ -17,6 +17,11 @@ class OrdenRepository(private val dao: OrdenDao) {
     fun getDisputes(): Flow<List<DisputeEntity>> = dao.getAllDisputes()
     fun getForks(): Flow<List<ForkEntity>> = dao.getAllForks()
     fun getSyncLogs(): Flow<List<SyncLogEntity>> = dao.getSyncLogs()
+    fun getChatMessages(): Flow<List<ChatMessageEntity>> = dao.getAllChatMessages()
+
+    suspend fun insertChatMessage(message: ChatMessageEntity) = withContext(Dispatchers.IO) {
+        dao.insertChatMessage(message)
+    }
 
     /**
      * Инициализация базовых демонстрационных данных при первом запуске
@@ -572,6 +577,21 @@ class OrdenRepository(private val dao: OrdenDao) {
                         return@withContext "Зафиксировано SMTP выполнение задачи [$tId] агентом $byAgent"
                     }
                 }
+                "CHAT_MESSAGE" -> {
+                    val msgText = extractVal(payload, "text")
+                    val rx = extractVal(payload, "recipientId")
+                    if (msgText.isNotBlank()) {
+                        dao.insertChatMessage(
+                            ChatMessageEntity(
+                                senderId = senderId,
+                                recipientId = rx.ifBlank { "broadcast" },
+                                messageText = msgText,
+                                timestamp = System.currentTimeMillis()
+                            )
+                        )
+                        return@withContext "Получено P2P сообщение от $senderId: '$msgText'"
+                    }
+                }
             }
             return@withContext "Данные P2P проверены, изменений не требуется или объект устарел."
         } catch (e: Exception) {
@@ -584,7 +604,7 @@ class OrdenRepository(private val dao: OrdenDao) {
      */
     suspend fun triggerNetworkSyncDemo(): String = withContext(Dispatchers.IO) {
         // Симулируем, что получили из внешнего почтового ящика IMAP действия от другого участника
-        val randomNum = (1..3).random()
+        val randomNum = (1..4).random()
         val peerMail = when(randomNum) {
             1 -> {
                 val p = "{\"proposalId\":\"prop-const-1\",\"voter\":\"alex@orden.p2p\",\"vote\":true,\"weight\":65.0}"
@@ -594,6 +614,11 @@ class OrdenRepository(private val dao: OrdenDao) {
             2 -> {
                 val p = "{\"id\":\"dispute-992\",\"jury\":\"maria@orden.p2p,alex@orden.p2p\"}"
                 val env = P2PEnvelope("ivan@orden.p2p", "local@orden.p2p", "JUDICIARY_SUMMON", "core", p, "SIG_IVAN_881C")
+                env.generateEmailBody()
+            }
+            3 -> {
+                val p = "{\"text\":\"Братва, настроил P2P транспорт через SMTP/IMAP, шифрование работает отлично. Все на связи?\",\"recipientId\":\"broadcast\"}"
+                val env = P2PEnvelope("maria@orden.p2p", "broadcast", "CHAT_MESSAGE", "core", p, "SIG_MARIA_F28C")
                 env.generateEmailBody()
             }
             else -> {
@@ -617,6 +642,18 @@ class OrdenRepository(private val dao: OrdenDao) {
         if (randomNum == 1) {
             castVote("prop-const-1", "alex@orden.p2p", true)
             return@withContext "Синхронизация IMAP завершена. Получен голос от Александра за 'Принятие Хартии'. Накат состояния успешен!"
+        }
+
+        if (randomNum == 3) {
+            dao.insertChatMessage(
+                ChatMessageEntity(
+                    senderId = "maria@orden.p2p",
+                    recipientId = "broadcast",
+                    messageText = "Братва, настроил P2P транспорт через SMTP/IMAP, шифрование работает отлично. Все на связи?",
+                    timestamp = System.currentTimeMillis()
+                )
+            )
+            return@withContext "Синхронизация IMAP завершена. Получено новое P2P сообщение в чат от Maria: 'Братва, настроил P2P транспорт...'"
         }
 
         return@withContext "Синхронизация IMAP завершена. Получено внешнее событие P2P. Накат состояния завершен без конфликтов!"

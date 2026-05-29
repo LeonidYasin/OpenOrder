@@ -49,11 +49,45 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
     val disputes by viewModel.disputes.collectAsState()
     val forks by viewModel.forks.collectAsState()
     val syncLogs by viewModel.syncLogs.collectAsState()
+    val chatMessages by viewModel.chatMessages.collectAsState()
     val consoleOutput by viewModel.consoleOutput.collectAsState()
     val showOnboarding by viewModel.showOnboarding.collectAsState()
+    val isSimulationEnabled by viewModel.isSimulationEnabled.collectAsState()
 
     var activeTab by remember { mutableStateOf(0) } // 0: Идеология, 1: Совет & Управа, 2: Суд, 3: Форки & Сеть
     var showRegisterDialog by remember { mutableStateOf(false) }
+    var showGoogleSetupDialog by remember { mutableStateOf(false) }
+    var inputGoogleAppPass by remember { mutableStateOf("") }
+
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    val handleGoogleJoin = {
+        val googleEmail = "leonidyasin@gmail.com"
+        val googleName = "Leonid Yasin"
+        // Register Agent with Google Email directly!
+        viewModel.registerAgent(
+            id = googleEmail,
+            name = googleName,
+            role = "Knight",
+            initialRep = 60.0,
+            customPubKey = "0x" + java.util.UUID.randomUUID().toString().replace("-", "").take(16).uppercase(),
+            autoLogin = true
+        )
+        // Auto-configure POP3/SMTP/IMAP servers for Gmail
+        viewModel.updateMailSettings(
+            smtpH = "smtp.gmail.com",
+            smtpP = 465,
+            imapH = "imap.gmail.com",
+            imapP = 993,
+            usr = googleEmail,
+            pas = "", // Will let user enter as App Password
+            ssl = true
+        )
+        viewModel.dismissOnboarding()
+        viewModel.writeConsole("Вход через Google: $googleEmail. Автонастройка Mail P2P (Gmail SMTP/IMAP).")
+        showGoogleSetupDialog = true
+        activeTab = 3 // Switch directly to network configuration to complete setup if needed!
+    }
 
     val currentAgent = agents.find { it.id == currentAgentId }
     val currentFork = forks.find { it.id == selectedForkId }
@@ -367,6 +401,40 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                                 .padding(top = 8.dp),
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
+                            // Google Quick Sign-In Option
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        handleGoogleJoin()
+                                        showRegisterDialog = false
+                                    }
+                                    .testTag("google_quick_join_btn"),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                border = BorderStroke(1.dp, Color(0xFFDADCE0))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("G ", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Быстрый вход через Google", color = Color(0xFF3C4043), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(modifier = Modifier.weight(1f).height(1.dp).background(TextMuted.copy(alpha = 0.2f)))
+                                Text(" ИЛИ ВВЕСТИ ВРУЧНУЮ ", color = TextMuted, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 8.dp))
+                                Box(modifier = Modifier.weight(1f).height(1.dp).background(TextMuted.copy(alpha = 0.2f)))
+                            }
+
                             OutlinedTextField(
                                 value = regId,
                                 onValueChange = { regId = it },
@@ -550,11 +618,13 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
             if (showOnboarding) {
                 OnboardingWelcomeDialog(
                     onDismiss = { viewModel.dismissOnboarding() },
+                    onGoogleJoin = handleGoogleJoin,
                     onQuickJoin = {
-                        val names = listOf("Радомир", "Святополк", "Данила", "Ярослав", "Всеволод", "Мирослава", "Лада", "Ольга", "Добрыня", "Любомир")
-                        val rId = "order_recruit_${(10..99).random()}@orden.p2p"
-                        val rName = "${names.random()} (Рекрут)"
-                        viewModel.registerAgent(rId, rName, "Knight")
+                        viewModel.registerAgent(
+                            id = "leonid_yasin@orden.p2p",
+                            name = "Леонид Ясин (Рекрут)",
+                            role = "Knight"
+                        )
                         viewModel.dismissOnboarding()
                         activeTab = 0
                     },
@@ -564,6 +634,97 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                     }
                 )
             }
+
+            if (showGoogleSetupDialog) {
+                AlertDialog(
+                    onDismissRequest = { showGoogleSetupDialog = false },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("G ", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                            Text("Интеграция с Google Mail", color = HighContrastGold, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Узел OpenOrder Social OS настроен на криптографическую подпись и Gmail P2P транспорт через ваш аккаунт leonidyasin@gmail.com.",
+                                color = TextLight,
+                                fontSize = 13.sp
+                            )
+                            Text(
+                                "Для защиты ваших личных данных Google блокирует вход внешних программ по основному паролю. Вам необходимо создать специальный безопасный пароль приложения.\n\nШаги:\n1️⃣ Перейдите в настройки своего аккаунта Google (Безопасность → Двухэтапная аутентификация → Пароли приложений)\n2️⃣ Сгенерируйте и скопируйте 16-значный код пароля приложения для 'OpenOrder'\n3️⃣ Вставьте сгенерированный код ниже:",
+                                color = TextLight,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                            
+                            OutlinedTextField(
+                                value = inputGoogleAppPass,
+                                onValueChange = { inputGoogleAppPass = it },
+                                label = { Text("Пароль приложения Google (App Password)") },
+                                placeholder = { Text("например, abcd efgh ijkl mnop") },
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = AccentTeal,
+                                    focusedLabelColor = AccentTeal,
+                                    unfocusedBorderColor = TextMuted,
+                                    unfocusedLabelColor = TextMuted,
+                                    focusedTextColor = TextLight,
+                                    unfocusedTextColor = TextLight
+                                ),
+                                modifier = Modifier.fillMaxWidth().testTag("google_app_pass_input"),
+                                singleLine = true
+                            )
+                            
+                            Button(
+                                onClick = {
+                                    val uri = android.net.Uri.parse("https://myaccount.google.com/apppasswords")
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                    context.startActivity(intent)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = AccentTeal),
+                                border = BorderStroke(1.dp, AccentTeal),
+                                shape = RoundedCornerShape(4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("🔗 Настройки аккаунта Google", fontSize = 11.sp)
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (inputGoogleAppPass.isNotBlank()) {
+                                    viewModel.updateMailSettings(
+                                        smtpH = "smtp.gmail.com",
+                                        smtpP = 465,
+                                        imapH = "imap.gmail.com",
+                                        imapP = 993,
+                                        usr = "leonidyasin@gmail.com",
+                                        pas = inputGoogleAppPass.trim(),
+                                        ssl = true
+                                    )
+                                    viewModel.writeConsole("Пароль приложения Google применен для P2P-ноды.")
+                                    viewModel.triggerSync()
+                                }
+                                showGoogleSetupDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark)
+                        ) {
+                            Text("ЗАВЕРШИТЬ НАСТРОЙКУ", fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showGoogleSetupDialog = false }) {
+                            Text(
+                                text = if (isSimulationEnabled) "ПОЗЖЕ / ИСПОЛЬЗОВАТЬ СИМУЛЯЦИЮ" else "ПОЗЖЕ (БЕЗ СИМУЛЯЦИИ)",
+                                color = TextMuted
+                            )
+                        }
+                    },
+                    containerColor = CosmicGray,
+                    tonalElevation = 8.dp
+                )
+            }
         }
     }
 }
@@ -571,6 +732,7 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
 @Composable
 fun OnboardingWelcomeDialog(
     onDismiss: () -> Unit,
+    onGoogleJoin: () -> Unit,
     onQuickJoin: () -> Unit,
     onStartQuest: () -> Unit
 ) {
@@ -667,9 +829,10 @@ fun OnboardingWelcomeDialog(
             }
         },
         confirmButton = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalAlignment = Alignment.End
             ) {
                 if (step < 2) {
                     Button(
@@ -680,23 +843,47 @@ fun OnboardingWelcomeDialog(
                         Text("Далее ➡️", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
                 } else {
-                    Button(
-                        onClick = onQuickJoin,
-                        colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
-                        shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("onboarding_quick_join_btn")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("⚔️ Вступить!", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        // Google Sign-In button
+                        Button(
+                            onClick = onGoogleJoin,
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF3C4043)),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("onboarding_google_join_btn")
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Войти по Google", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+                        }
+                        Button(
+                            onClick = onQuickJoin,
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("onboarding_quick_join_btn")
+                        ) {
+                            Text("⚔️ Вступить!", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                     }
-                    Button(
-                        onClick = onStartQuest,
-                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                        shape = RoundedCornerShape(4.dp),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                        modifier = Modifier.testTag("onboarding_start_quest_btn")
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("🎯 Квесты", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        Button(
+                            onClick = onStartQuest,
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            modifier = Modifier.testTag("onboarding_start_quest_btn")
+                        ) {
+                            Text("🎯 Квесты", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        }
                     }
                 }
             }
@@ -940,10 +1127,11 @@ fun ArchitectureTab(
                                 ) {
                                     Button(
                                         onClick = {
-                                            val names = listOf("Радомир", "Святополк", "Данила", "Ярослав", "Всеволод", "Мирослава", "Лада", "Ольга", "Добрыня", "Любомир")
-                                            val rId = "order_recruit_${(10..99).random()}@orden.p2p"
-                                            val rName = "${names.random()} (Рекрут)"
-                                            viewModel.registerAgent(rId, rName, "Knight")
+                                            viewModel.registerAgent(
+                                                id = "leonid_yasin@orden.p2p",
+                                                name = "Леонид Ясин (Рекрут)",
+                                                role = "Knight"
+                                            )
                                         },
                                         colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
                                         modifier = Modifier.weight(1f).height(36.dp).testTag("quick_join_btn"),
@@ -1947,6 +2135,10 @@ fun RepositoryForksTab(
     val activeMailPass by viewModel.mailPass.collectAsState()
     val activeUseSsl by viewModel.useSsl.collectAsState()
 
+    val chatMessages by viewModel.chatMessages.collectAsState()
+    val currentAgentId by viewModel.currentAgentId.collectAsState()
+    val isSimulationEnabled by viewModel.isSimulationEnabled.collectAsState()
+
     var smtpHostInput by remember(activeSmtpHost) { mutableStateOf(activeSmtpHost) }
     var smtpPortInput by remember(activeSmtpPort) { mutableStateOf(activeSmtpPort.toString()) }
     var imapHostInput by remember(activeImapHost) { mutableStateOf(activeImapHost) }
@@ -2119,6 +2311,45 @@ fun RepositoryForksTab(
                     }
 
                     if (showSettings) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (isSimulationEnabled) Color.Transparent else CyberGreen.copy(alpha = 0.08f))
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "Режим симуляции сети (Fallback Sandbox)",
+                                    color = if (isSimulationEnabled) HighContrastGold else CyberGreen,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                                Text(
+                                    if (isSimulationEnabled) 
+                                        "Включен автогенератор демо-событий при ошибках или полупустых полях."
+                                    else 
+                                        "Только РЕАЛЬНОЕ сетевое SMTP/IMAP взаимодействие без подмешивания демо-данных.",
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp
+                                )
+                            }
+                            Switch(
+                                checked = isSimulationEnabled,
+                                onCheckedChange = { viewModel.setSimulationEnabled(it) },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = SpaceDark,
+                                    checkedTrackColor = HighContrastGold,
+                                    uncheckedThumbColor = SpaceDark,
+                                    uncheckedTrackColor = CosmicGray
+                                ),
+                                modifier = Modifier.testTag("simulation_toggle_switch")
+                            )
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "Для связи вне цензуры на реальных SMTP/IMAP серверах, укажите параметры своего почтового ящика ниже. Рекомендуется использовать специальный пароль приложения (App Password).",
@@ -2376,6 +2607,255 @@ fun RepositoryForksTab(
                             color = TextMuted,
                             fontSize = 10.sp
                         )
+                    }
+                }
+            }
+        }
+
+        item {
+            SeparatorTitle("ЗАШИФРОВАННЫЙ P2P ЧАТ (SECURE CHAT OVER SMTP)")
+            
+            var chatInputText by remember { mutableStateOf("") }
+            var selectedRecipientId by remember { mutableStateOf("broadcast") }
+            var showRecipientDropdown by remember { mutableStateOf(false) }
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                border = BorderStroke(1.dp, TextMuted.copy(alpha = 0.2f))
+            ) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Text(
+                        text = "Децентрализованный P2P чат. Каждое сообщение шифруется, подписывается вашей ЭЦП и отправляется через SMTP почтовый сервер получателям.",
+                        color = TextLight,
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    // Сетка сообщений
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = SpaceDark),
+                        border = BorderStroke(1.dp, CosmicGray)
+                    ) {
+                        if (chatMessages.isEmpty()) {
+                            Box(
+                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "Сообщений нет. Выберите собеседника ниже и отправьте первое подписанное P2P-сообщение!",
+                                    color = TextMuted,
+                                    fontSize = 11.sp,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                            }
+                        } else {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val latestMessages = chatMessages.takeLast(5)
+                                latestMessages.forEach { msg ->
+                                    val isMe = msg.senderId == currentAgentId
+                                    val format = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+                                    val timeStr = format.format(Date(msg.timestamp))
+                                    
+                                    val senderInitials = msg.senderId.substringBefore("@").take(2).uppercase()
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = if (isMe) Arrangement.End else Arrangement.Start,
+                                        verticalAlignment = Alignment.Top
+                                    ) {
+                                        if (!isMe) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(HighContrastGold, shape = RoundedCornerShape(12.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    senderInitials,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = SpaceDark
+                                                )
+                                            }
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                        }
+
+                                        Column(
+                                            horizontalAlignment = if (isMe) Alignment.End else Alignment.Start,
+                                            modifier = Modifier.weight(1f, fill = false)
+                                        ) {
+                                            Text(
+                                                text = if (isMe) "Вы" else msg.senderId,
+                                                color = if (isMe) CyberGreen else HighContrastGold,
+                                                fontSize = 9.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Card(
+                                                shape = RoundedCornerShape(8.dp),
+                                                colors = CardDefaults.cardColors(
+                                                    containerColor = if (isMe) CyberGreen.copy(0.12f) else CosmicGray
+                                                ),
+                                                border = BorderStroke(1.dp, if (isMe) CyberGreen.copy(0.4f) else CosmicGray.copy(0.4f)),
+                                                modifier = Modifier.padding(top = 2.dp)
+                                            ) {
+                                                Column(modifier = Modifier.padding(8.dp)) {
+                                                    Text(
+                                                        text = msg.messageText,
+                                                        color = TextLight,
+                                                        fontSize = 12.sp
+                                                    )
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(top = 2.dp)
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Email,
+                                                            contentDescription = null,
+                                                            tint = TextMuted,
+                                                            modifier = Modifier.size(8.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(2.dp))
+                                                        Text(
+                                                            "SMTP P2P • $timeStr",
+                                                            color = TextMuted,
+                                                            fontSize = 8.sp
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (isMe) {
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(24.dp)
+                                                    .background(CyberGreen, shape = RoundedCornerShape(12.dp)),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    senderInitials,
+                                                    fontSize = 9.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = SpaceDark
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Выбор получателя & Кнопка/Поле ввода
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Выбор получателя
+                        Box {
+                            Button(
+                                onClick = { showRecipientDropdown = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = TextLight),
+                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(1.dp, TextMuted.copy(alpha = 0.5f)),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                modifier = Modifier.height(48.dp)
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        text = if (selectedRecipientId == "broadcast") "📢 Всем" else selectedRecipientId.substringBefore("@"),
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Icon(
+                                        imageVector = Icons.Default.ArrowDropDown,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = showRecipientDropdown,
+                                onDismissRequest = { showRecipientDropdown = false },
+                                modifier = Modifier.background(CosmicGray)
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("📢 В общий канал (broadcast)", color = TextLight, fontSize = 12.sp) },
+                                    onClick = {
+                                        selectedRecipientId = "broadcast"
+                                        showRecipientDropdown = false
+                                    }
+                                )
+                                agents.filter { it.id != currentAgentId }.forEach { agent ->
+                                    DropdownMenuItem(
+                                        text = { Text("👤 ${agent.name} (${agent.id.substringBefore("@")})", color = TextLight, fontSize = 12.sp) },
+                                        onClick = {
+                                            selectedRecipientId = agent.id
+                                            showRecipientDropdown = false
+                                        }
+                                    )
+                                }
+                            }
+                        }
+
+                        // Текстовое поле ввода
+                        OutlinedTextField(
+                            value = chatInputText,
+                            onValueChange = { chatInputText = it },
+                            placeholder = { Text("Текст зашифрованного P2P...", fontSize = 11.sp) },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = CyberGreen,
+                                focusedLabelColor = CyberGreen,
+                                unfocusedBorderColor = TextMuted.copy(0.4f),
+                                unfocusedLabelColor = TextMuted,
+                                focusedTextColor = TextLight,
+                                unfocusedTextColor = TextLight
+                            ),
+                            shape = RoundedCornerShape(4.dp),
+                            singleLine = true,
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(48.dp)
+                                .testTag("chat_input_field")
+                        )
+
+                        // Кнопка отправить
+                        Button(
+                            onClick = {
+                                if (chatInputText.isNotBlank()) {
+                                    viewModel.sendChatMessage(selectedRecipientId, chatInputText)
+                                    chatInputText = ""
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
+                            shape = RoundedCornerShape(4.dp),
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .testTag("send_chat_msg_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Send,
+                                contentDescription = "Отправить P2P сообщение",
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
