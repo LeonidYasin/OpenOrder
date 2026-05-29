@@ -50,6 +50,7 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
     val forks by viewModel.forks.collectAsState()
     val syncLogs by viewModel.syncLogs.collectAsState()
     val consoleOutput by viewModel.consoleOutput.collectAsState()
+    val showOnboarding by viewModel.showOnboarding.collectAsState()
 
     var activeTab by remember { mutableStateOf(0) } // 0: Идеология, 1: Совет & Управа, 2: Суд, 3: Форки & Сеть
     var showRegisterDialog by remember { mutableStateOf(false) }
@@ -316,7 +317,7 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
             // Tab Content
             Box(modifier = Modifier.weight(1f)) {
                 when (activeTab) {
-                    0 -> ArchitectureTab()
+                    0 -> ArchitectureTab(viewModel) { activeTab = it }
                     1 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId)
                     2 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId)
                     3 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents)
@@ -545,16 +546,194 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                     tonalElevation = 8.dp
                 )
             }
+
+            if (showOnboarding) {
+                OnboardingWelcomeDialog(
+                    onDismiss = { viewModel.dismissOnboarding() },
+                    onQuickJoin = {
+                        val names = listOf("Радомир", "Святополк", "Данила", "Ярослав", "Всеволод", "Мирослава", "Лада", "Ольга", "Добрыня", "Любомир")
+                        val rId = "order_recruit_${(10..99).random()}@orden.p2p"
+                        val rName = "${names.random()} (Рекрут)"
+                        viewModel.registerAgent(rId, rName, "Knight")
+                        viewModel.dismissOnboarding()
+                        activeTab = 0
+                    },
+                    onStartQuest = {
+                        viewModel.dismissOnboarding()
+                        activeTab = 0
+                    }
+                )
+            }
         }
     }
+}
+
+@Composable
+fun OnboardingWelcomeDialog(
+    onDismiss: () -> Unit,
+    onQuickJoin: () -> Unit,
+    onStartQuest: () -> Unit
+) {
+    var step by remember { mutableStateOf(0) }
+
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Star,
+                    contentDescription = null,
+                    tint = AccentTeal,
+                    modifier = Modifier.size(24.dp)
+                )
+                Text(
+                    text = "🌌 ОТКРЫТЫЙ ОРДЕН",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = HighContrastGold
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Stepper indicator
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    repeat(3) { index ->
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(if (index <= step) AccentTeal else CosmicGray)
+                        )
+                    }
+                }
+
+                when (step) {
+                    0 -> {
+                        Text(
+                            text = "Приветствуем в Social OS!",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = AccentTeal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Вы открыли интерфейс децентрализованной цифровой республики со встроенным суверенитетом и властью репутации.\n\nЗдесь нет паролей, центральных баз данных или модераторов: все решения и данные синхронизируются пир-ту-пир прямо поверх электронной почты!",
+                            color = TextLight,
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    }
+                    1 -> {
+                        Text(
+                            text = "4 Ключевых Цифровых Института",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = AccentTeal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "🏛️ Законодательный Совет\nГолосование репутацией за реформы ордена и форки кода.\n\n🔧 Исполнительное Братство\nБрать на себя и закрывать задачи, зарабатывая очки REP.\n\n⚖️ Независимый Суд\nКонституционные споры присяжных для соблюдения законов.\n\n📡 Стек Сетевой Синхронизации\nP2P транспорт через SMTP/IMAP поверх любых почтовых узлов.",
+                            color = TextLight,
+                            fontSize = 13.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                    2 -> {
+                        Text(
+                            text = "Интерактивный Квест Сообщества",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = AccentTeal,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Пройдите 4 простых шага, чтобы разобраться:\n1️⃣ Принять присягу (зарегистрировать ID)\n2️⃣ Сделать первый выбор в Совете\n3️⃣ Ознакомиться со спором в Суде\n4️⃣ Запустить мониторинг и синхрон по P2P\n\nГотовы вступить в братство и получить первые баллы репутации?",
+                            color = TextLight,
+                            fontSize = 13.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (step < 2) {
+                    Button(
+                        onClick = { step++ },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                        shape = RoundedCornerShape(4.dp)
+                    ) {
+                        Text("Далее ➡️", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                } else {
+                    Button(
+                        onClick = onQuickJoin,
+                        colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.testTag("onboarding_quick_join_btn")
+                    ) {
+                        Text("⚔️ Вступить!", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                    Button(
+                        onClick = onStartQuest,
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                        shape = RoundedCornerShape(4.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        modifier = Modifier.testTag("onboarding_start_quest_btn")
+                    ) {
+                        Text("🎯 Квесты", fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            if (step > 0) {
+                TextButton(onClick = { step-- }) {
+                    Text("⬅️ Назад", color = TextMuted, fontSize = 11.sp)
+                }
+            } else {
+                TextButton(
+                    onClick = { onDismiss() },
+                    modifier = Modifier.testTag("onboarding_skip_btn")
+                ) {
+                    Text("Пропустить", color = TextMuted, fontSize = 11.sp)
+                }
+            }
+        },
+        containerColor = CosmicGray,
+        tonalElevation = 8.dp
+    )
 }
 
 // -------------------------------------------------------------
 // TAB 0: DESCRIPTION & OOP CLASS MODEL MODEL
 // -------------------------------------------------------------
 @Composable
-fun ArchitectureTab() {
-    var subTab by remember { mutableStateOf(0) } // 0: Идеология, 1: Классы, 2: Stack P2P
+fun ArchitectureTab(
+    viewModel: SuiteViewModel,
+    onSwitchTab: (Int) -> Unit
+) {
+    var subTab by remember { mutableStateOf(0) } // 0: Быстрый Старт, 1: Институты, 2: Классовая Модель, 3: P2P Стек
+
+    val mRegistered by viewModel.missionRegistered.collectAsState()
+    val mVoted by viewModel.missionVoted.collectAsState()
+    val mDispute by viewModel.missionDispute.collectAsState()
+    val mSynced by viewModel.missionSynced.collectAsState()
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
@@ -565,45 +744,402 @@ fun ArchitectureTab() {
         ) {
             Button(
                 onClick = { subTab = 0 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1.1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (subTab == 0) AccentTeal else CosmicGray,
                     contentColor = if (subTab == 0) SpaceDark else TextLight
                 ),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(4.dp)
             ) {
-                Text("Объекты-Институты", fontSize = 11.sp)
+                Text("🚀 Старт", fontSize = 10.sp, fontWeight = FontWeight.Bold)
             }
             Button(
                 onClick = { subTab = 1 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1.1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (subTab == 1) AccentTeal else CosmicGray,
                     contentColor = if (subTab == 1) SpaceDark else TextLight
                 ),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(4.dp)
             ) {
-                Text("Классовая Модель", fontSize = 11.sp)
+                Text("🏛️ Институты", fontSize = 10.sp)
             }
             Button(
                 onClick = { subTab = 2 },
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1.1f),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = if (subTab == 2) AccentTeal else CosmicGray,
                     contentColor = if (subTab == 2) SpaceDark else TextLight
                 ),
-                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(4.dp)
             ) {
-                Text("P2P Стек & Синх", fontSize = 11.sp)
+                Text("💻 Классы", fontSize = 10.sp)
+            }
+            Button(
+                onClick = { subTab = 3 },
+                modifier = Modifier.weight(1.1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (subTab == 3) AccentTeal else CosmicGray,
+                    contentColor = if (subTab == 3) SpaceDark else TextLight
+                ),
+                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
+                shape = RoundedCornerShape(4.dp)
+            ) {
+                Text("📡 P2P Стек", fontSize = 10.sp)
             }
         }
 
         LazyColumn(modifier = Modifier.weight(1f)) {
             when (subTab) {
                 0 -> {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, AccentTeal.copy(alpha = 0.4f))
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    "🌌 ДОБРО ПОЖАЛОВАТЬ В ОТКРЫТЫЙ ОРДЕН!",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = HighContrastGold,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    "Вы зашли в Social OS — децентрализованную цифровую республику со встроенным репутационным суверенитетом. Здесь нет ни одного централизованного сервера: все решения синхронизируются пир-ту-пир прямо поверх электронной почты.",
+                                    color = TextLight,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Пройдите увлекательный Интерактивный Квест Сообщества, чтобы понять, как устроена цифровая власть, заслужить первые очки репутации (REP) и влиться в братство!",
+                                    color = SoftCyan,
+                                    fontSize = 12.sp,
+                                    lineHeight = 16.sp
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    TextButton(
+                                        onClick = { viewModel.resetOnboarding() },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp).testTag("reopen_onboarding_btn")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = null,
+                                            tint = AccentTeal,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("Повторить презентацию", color = AccentTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Progress Tracker Bar
+                    item {
+                        val completedCount = (if (mRegistered) 1 else 0) + 
+                                             (if (mVoted) 1 else 0) + 
+                                             (if (mDispute) 1 else 0) + 
+                                             (if (mSynced) 1 else 0)
+                        
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color.Black),
+                            border = BorderStroke(1.dp, CosmicGray)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "🏆 Прогресс Квеста Новичка:",
+                                        color = TextLight,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                    Text(
+                                        "$completedCount из 4 закладок",
+                                        color = if (completedCount == 4) CyberGreen else HighContrastGold,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LinearProgressIndicator(
+                                    progress = { completedCount / 4.0f },
+                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                    color = if (completedCount == 4) CyberGreen else AccentTeal,
+                                    trackColor = CosmicGray
+                                )
+                            }
+                        }
+                    }
+
+                    // Mission 1 Card
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.AccountCircle,
+                                            contentDescription = null,
+                                            tint = if (mRegistered) CyberGreen else HighContrastGold,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Шаг 1: Принять присягу (Создать ID)",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentTeal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    if (mRegistered) {
+                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission1_done"))
+                                    } else {
+                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission1_pending"))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Создайте собственный суверенный P2P крипто-идентификатор в формате user@orden.p2p и подпишите общественный договор.",
+                                    color = TextLight,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Button(
+                                        onClick = {
+                                            val names = listOf("Радомир", "Святополк", "Данила", "Ярослав", "Всеволод", "Мирослава", "Лада", "Ольга", "Добрыня", "Любомир")
+                                            val rId = "order_recruit_${(10..99).random()}@orden.p2p"
+                                            val rName = "${names.random()} (Рекрут)"
+                                            viewModel.registerAgent(rId, rName, "Knight")
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                                        modifier = Modifier.weight(1f).height(36.dp).testTag("quick_join_btn"),
+                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text("⚔️ Вступить в 1 клик", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                    
+                                    OutlinedButton(
+                                        onClick = {
+                                            onSwitchTab(3) // Switch to tab 3 to configure
+                                        },
+                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextLight),
+                                        border = BorderStroke(1.dp, TextMuted),
+                                        modifier = Modifier.weight(1f).height(36.dp),
+                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                        shape = RoundedCornerShape(4.dp)
+                                    ) {
+                                        Text("⚙️ Полная настройка", fontSize = 11.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Mission 2 Card
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.CheckCircle,
+                                            contentDescription = null,
+                                            tint = if (mVoted) CyberGreen else HighContrastGold,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Шаг 2: Первый голос в Совете",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentTeal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    if (mVoted) {
+                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission2_done"))
+                                    } else {
+                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission2_pending"))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Влияйте на законодательство Ордена! Ознакомьтесь с 'Принятием Хартии Цифрового Суверенитета' и отдайте свой голос за или против.",
+                                    color = TextLight,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { onSwitchTab(1) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = if (mVoted) CosmicGray else HighContrastGold, contentColor = SpaceDark),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("go_to_council_btn"),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("🗳️ Перейти к Голосованию", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (mVoted) TextLight else SpaceDark)
+                                }
+                            }
+                        }
+                    }
+
+                    // Mission 3 Card
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Warning,
+                                            contentDescription = null,
+                                            tint = if (mDispute) CyberGreen else HighContrastGold,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Шаг 3: Судейское правосудие",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentTeal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    if (mDispute) {
+                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission3_done"))
+                                    } else {
+                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission3_pending"))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "В Ордене нет полиции — порядок поддерживают сами участники. Примите участие в рассмотрении конституционного спора dispute-001 в качестве присяжного.",
+                                    color = TextLight,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { onSwitchTab(2) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = if (mDispute) CosmicGray else HighContrastGold, contentColor = SpaceDark),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("go_to_court_btn"),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("⚖️ Открыть Судебные Тяжбы", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (mDispute) TextLight else SpaceDark)
+                                }
+                            }
+                        }
+                    }
+
+                    // Mission 4 Card
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Email,
+                                            contentDescription = null,
+                                            tint = if (mSynced) CyberGreen else HighContrastGold,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            "Шаг 4: Синхронизировать узлы по P2P",
+                                            fontWeight = FontWeight.Bold,
+                                            color = AccentTeal,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                    if (mSynced) {
+                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission4_done"))
+                                    } else {
+                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission4_pending"))
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "Запустите протокол слияния данных, который опросит вашу overlay-почту или симулирует P2P-сеть для получения последних дельт репутации.",
+                                    color = TextLight,
+                                    fontSize = 12.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = { viewModel.triggerSync() },
+                                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
+                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("trigger_sync_quest_btn"),
+                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
+                                    shape = RoundedCornerShape(4.dp)
+                                ) {
+                                    Text("📡 Запустить Мониторинг Сети", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                    }
+                }
+                1 -> {
                     item {
                         Text(
                             "АРХИТЕКТУРНЫЕ ИНСТИТУТЫ (Social OS)",
@@ -641,7 +1177,7 @@ fun ArchitectureTab() {
                         }
                     }
                 }
-                1 -> {
+                2 -> {
                     item {
                         Text(
                             "КЛАССОВАЯ МОДЕЛЬ ООП (Чистая Архитектура)",
@@ -682,7 +1218,7 @@ fun ArchitectureTab() {
                         }
                     }
                 }
-                2 -> {
+                3 -> {
                     item {
                         Text(
                             "P2P ЯДРО СИНХРОНИЗАЦИИ SMTP / IMAP",

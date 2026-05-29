@@ -22,7 +22,7 @@ class OrdenRepository(private val dao: OrdenDao) {
      * Инициализация базовых демонстрационных данных при первом запуске
      */
     suspend fun initializeSeedData() = withContext(Dispatchers.IO) {
-        val currentForks = dao.getAllForks().first()
+        val currentForks = dao.getAllForksDirect()
         if (currentForks.isEmpty()) {
             // 1. Создание главного репозитория (ядро)
             val coreFork = ForkEntity(
@@ -279,7 +279,7 @@ class OrdenRepository(private val dao: OrdenDao) {
      * для исключения сговоров и обеспечения меритократической непредвзятости.
      */
     suspend fun raiseDispute(plaintiffId: String, defendantId: String, description: String, article: String): String = withContext(Dispatchers.IO) {
-        val allAgents = dao.getAllAgents().first()
+        val allAgents = dao.getAllAgentsDirect()
         // Отбираем кандидатов с высокой репутацией (>= 50.0), исключая участников спора
         val eligibleArbiters = allAgents.filter { 
             it.reputationScore >= 50.0 && it.id != plaintiffId && it.id != defendantId 

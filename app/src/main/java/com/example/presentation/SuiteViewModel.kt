@@ -42,6 +42,31 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     private val _useSsl = MutableStateFlow(prefs.getBoolean("use_ssl", true))
     val useSsl = _useSsl.asStateFlow()
 
+    private val _missionRegistered = MutableStateFlow(prefs.getBoolean("mission_registered", false))
+    val missionRegistered = _missionRegistered.asStateFlow()
+
+    private val _missionVoted = MutableStateFlow(prefs.getBoolean("mission_voted", false))
+    val missionVoted = _missionVoted.asStateFlow()
+
+    private val _missionDispute = MutableStateFlow(prefs.getBoolean("mission_dispute", false))
+    val missionDispute = _missionDispute.asStateFlow()
+
+    private val _missionSynced = MutableStateFlow(prefs.getBoolean("mission_synced", false))
+    val missionSynced = _missionSynced.asStateFlow()
+
+    private val _showOnboarding = MutableStateFlow(prefs.getBoolean("show_onboarding_welcome", true))
+    val showOnboarding = _showOnboarding.asStateFlow()
+
+    fun dismissOnboarding() {
+        prefs.edit().putBoolean("show_onboarding_welcome", false).apply()
+        _showOnboarding.value = false
+    }
+
+    fun resetOnboarding() {
+        prefs.edit().putBoolean("show_onboarding_welcome", true).apply()
+        _showOnboarding.value = true
+    }
+
     fun updateMailSettings(smtpH: String, smtpP: Int, imapH: String, imapP: Int, usr: String, pas: String, ssl: Boolean) {
         prefs.edit().apply {
             putString("smtp_host", smtpH)
@@ -217,6 +242,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
             repository.registerAgent(newAgent)
             writeConsole("В реестр Ордена внесен новый участник: $cleanId [Ключ: ${finalPubKey.take(10)}...]")
             
+            prefs.edit().putBoolean("mission_registered", true).apply()
+            _missionRegistered.value = true
+
             if (autoLogin) {
                 _currentAgentId.value = cleanId
                 writeConsole("Сессия переключена на нового участника: $cleanId")
@@ -233,8 +261,11 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val response = repository.castVote(proposalId, _currentAgentId.value, votedYes)
             writeConsole(response)
-            if (response.contains("успешно") || response.contains("Кворум") || response.contains("Голос")) {
+            if (response.contains("успешно") || response.contains("Кворум") || response.contains("Голос") || response.contains("удовлетворен")) {
                 broadcastToPeers("CAST_VOTE", _selectedForkId.value, "{\"proposalId\":\"$proposalId\",\"voter\":\"${_currentAgentId.value}\",\"vote\":$votedYes}")
+                
+                prefs.edit().putBoolean("mission_voted", true).apply()
+                _missionVoted.value = true
             }
         }
     }
@@ -282,6 +313,10 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val response = repository.castJuryVote(disputeId, _currentAgentId.value, voteGuilty)
             writeConsole(response)
+            if (response.contains("успешно") || response.contains("принят") || response.contains("Голос")) {
+                prefs.edit().putBoolean("mission_dispute", true).apply()
+                _missionDispute.value = true
+            }
         }
     }
 
@@ -306,6 +341,9 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun triggerSync() {
+        prefs.edit().putBoolean("mission_synced", true).apply()
+        _missionSynced.value = true
+
         val settings = getMailSettings()
         if (settings.user.isBlank() || settings.pass.isBlank()) {
             viewModelScope.launch {

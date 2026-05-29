@@ -1,11 +1,12 @@
 package com.example
 
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import com.example.ui.theme.MyApplicationTheme
 import com.example.presentation.OpenOrderSocialOSApp
 import com.example.presentation.SuiteViewModel
-import androidx.test.core.app.ApplicationProvider
 import android.app.Application
 import com.github.takahirom.roborazzi.RobolectricDeviceQualifiers
 import com.github.takahirom.roborazzi.captureRoboImage
@@ -21,18 +22,28 @@ import org.robolectric.annotation.GraphicsMode
 @Config(qualifiers = RobolectricDeviceQualifiers.Pixel8, sdk = [36])
 class GreetingScreenshotTest {
 
-  @get:Rule val composeTestRule = createComposeRule()
+  @get:Rule val composeTestRule = createAndroidComposeRule<MainActivity>()
 
   @Test
   fun greeting_screenshot() {
-    val application = ApplicationProvider.getApplicationContext<Application>()
-    val viewModel = SuiteViewModel(application)
-    composeTestRule.setContent {
-      MyApplicationTheme {
-        OpenOrderSocialOSApp(viewModel)
-      }
-    }
-
+    composeTestRule.waitForIdle()
     composeTestRule.onRoot().captureRoboImage(filePath = "src/test/screenshots/greeting.png")
   }
+
+  @Test
+  fun testOnboardingAndTabNavigationFlow() {
+    composeTestRule.waitForIdle()
+    // Find skip button on onboarding, click it
+    try {
+      composeTestRule.onNodeWithTag("onboarding_skip_btn").performClick()
+    } catch (e: Throwable) {
+      // In case user settings already had onboarding false, catch it gracefully
+    }
+    composeTestRule.waitForIdle()
+
+    // Find and click sync button
+    composeTestRule.onNodeWithTag("sync_btn").performClick()
+    composeTestRule.waitForIdle()
+  }
 }
+

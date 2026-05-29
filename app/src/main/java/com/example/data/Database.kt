@@ -98,6 +98,9 @@ interface OrdenDao {
     @Query("SELECT * FROM agents ORDER BY reputationScore DESC")
     fun getAllAgents(): Flow<List<AgentEntity>>
 
+    @Query("SELECT * FROM agents ORDER BY reputationScore DESC")
+    suspend fun getAllAgentsDirect(): List<AgentEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAgent(agent: AgentEntity)
 
@@ -147,6 +150,9 @@ interface OrdenDao {
     // Forks
     @Query("SELECT * FROM forks ORDER BY createdAt ASC")
     fun getAllForks(): Flow<List<ForkEntity>>
+
+    @Query("SELECT * FROM forks ORDER BY createdAt ASC")
+    suspend fun getAllForksDirect(): List<ForkEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFork(fork: ForkEntity)
