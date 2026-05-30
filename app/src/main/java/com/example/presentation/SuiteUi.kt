@@ -5,6 +5,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,9 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.*
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -27,16 +33,16 @@ import com.example.data.*
 import java.text.SimpleDateFormat
 import java.util.*
 
-// Custom Color Palette for the Cosmic P2P Brotherhood
-val SpaceDark = Color(0xFF0F1219)
-val CosmicGray = Color(0xFF1B202D)
-val AccentTeal = Color(0xFF00E5FF)
-val HighContrastGold = Color(0xFFFFBF00)
-val CyberGreen = Color(0xFF00E676)
-val SoftCyan = Color(0xFF80DEEA)
-val TextLight = Color(0xFFE3E9F3)
-val TextMuted = Color(0xFF8C96A6)
-val AlertRed = Color(0xFFFF5252)
+// Custom Color Palette for the Cosmic P2P Brotherhood - Redefined for Positive Light Google/Apple style
+val SpaceDark = Color(0xFFF1F5F9) // Warm, premium light slate gray background
+val CosmicGray = Color(0xFFFFFFFF) // Pure white, clean cards
+val AccentTeal = Color(0xFF1A73E8) // Bright, positive modern blue (Google/Apple style)
+val HighContrastGold = Color(0xFFD97706) // Legible honey amber for reputation scores
+val CyberGreen = Color(0xFF16A34A) // Calm, positive grass green for success
+val SoftCyan = Color(0xFF0284C7) // Sky blue for secondary elements
+val TextLight = Color(0xFF0F172A) // Sleek slate-black text (formerly TextLight prefix)
+val TextMuted = Color(0xFF64748B) // Slate 500 gray for subtext
+val AlertRed = Color(0xFFDC2626) // Pristine, professional red
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,66 +98,101 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
     val currentAgent = agents.find { it.id == currentAgentId }
     val currentFork = forks.find { it.id == selectedForkId }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SpaceDark,
-                    titleContentColor = AccentTeal
-                ),
-                title = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Star,
-                            contentDescription = "Order Logo",
-                            tint = AccentTeal,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Column {
-                            Text(
-                                text = "ОТКРЫТЫЙ ОРДЕН",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    letterSpacing = 1.5.sp
-                                )
+    var isConsoleVisible by remember { mutableStateOf(false) }
+    var isLeftDrawerOpen by remember { mutableStateOf(false) }
+    var isRightDrawerOpen by remember { mutableStateOf(false) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = SpaceDark,
+                        titleContentColor = AccentTeal
+                    ),
+                    navigationIcon = {
+                        IconButton(onClick = { isLeftDrawerOpen = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Menu,
+                                contentDescription = "Open Navigation Menu",
+                                tint = AccentTeal
                             )
-                            Text(
-                                "Social Operating System • P2P Kernel v1.0",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = TextMuted,
-                                    fontSize = 10.sp
+                        }
+                    },
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "Order Logo",
+                                tint = AccentTeal,
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Column {
+                                Text(
+                                    text = "ОТКРЫТЫЙ ОРДЕН",
+                                    style = MaterialTheme.typography.titleMedium.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.2.sp,
+                                        fontSize = 14.sp
+                                    )
                                 )
+                                Text(
+                                        "Social Operating System • P2P Kernel v1.0",
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = TextMuted,
+                                        fontSize = 9.sp
+                                    )
+                                )
+                            }
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = { isConsoleVisible = !isConsoleVisible },
+                            modifier = Modifier.testTag("console_toggle_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Build,
+                                contentDescription = "Toggle Console Logs",
+                                tint = if (isConsoleVisible) AccentTeal else TextMuted
+                            )
+                        }
+                        IconButton(
+                            onClick = { viewModel.triggerSync() },
+                            modifier = Modifier.testTag("sync_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Sync P2P Mail",
+                                tint = AccentTeal
+                            )
+                        }
+                        IconButton(
+                            onClick = { isRightDrawerOpen = true },
+                            modifier = Modifier.testTag("right_panel_btn")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Open Profile & Node Status",
+                                tint = AccentTeal
                             )
                         }
                     }
-                },
-                actions = {
-                    IconButton(
-                        onClick = { viewModel.triggerSync() },
-                        modifier = Modifier.testTag("sync_btn")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = "Sync P2P Mail",
-                            tint = AccentTeal
-                        )
-                    }
-                }
-            )
-        },
+                )
+            },
         bottomBar = {
             NavigationBar(
-                containerColor = SpaceDark,
+                containerColor = CosmicGray,
                 contentColor = TextLight,
                 tonalElevation = 8.dp
             ) {
                 NavigationBarItem(
                     selected = activeTab == 0,
                     onClick = { activeTab = 0 },
-                    icon = { Icon(Icons.Default.Home, "Architecture") },
-                    label = { Text("Идеология", fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.List, "Map") },
+                    label = { Text("Карта", fontSize = 11.sp, fontWeight = if (activeTab == 0) FontWeight.Bold else FontWeight.Normal) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpaceDark,
+                        selectedIconColor = Color.White,
                         selectedTextColor = AccentTeal,
                         indicatorColor = AccentTeal,
                         unselectedIconColor = TextMuted,
@@ -161,10 +202,10 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                 NavigationBarItem(
                     selected = activeTab == 1,
                     onClick = { activeTab = 1 },
-                    icon = { Icon(Icons.Default.CheckCircle, "Council") },
-                    label = { Text("Совет & Управа", fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.Home, "Architecture") },
+                    label = { Text("Идея", fontSize = 11.sp, fontWeight = if (activeTab == 1) FontWeight.Bold else FontWeight.Normal) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpaceDark,
+                        selectedIconColor = Color.White,
                         selectedTextColor = AccentTeal,
                         indicatorColor = AccentTeal,
                         unselectedIconColor = TextMuted,
@@ -174,10 +215,10 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                 NavigationBarItem(
                     selected = activeTab == 2,
                     onClick = { activeTab = 2 },
-                    icon = { Icon(Icons.Default.Warning, "Judiciary") },
-                    label = { Text("Суд", fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.CheckCircle, "Council") },
+                    label = { Text("Совет", fontSize = 11.sp, fontWeight = if (activeTab == 2) FontWeight.Bold else FontWeight.Normal) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpaceDark,
+                        selectedIconColor = Color.White,
                         selectedTextColor = AccentTeal,
                         indicatorColor = AccentTeal,
                         unselectedIconColor = TextMuted,
@@ -187,10 +228,23 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                 NavigationBarItem(
                     selected = activeTab == 3,
                     onClick = { activeTab = 3 },
-                    icon = { Icon(Icons.Default.Email, "Repository") },
-                    label = { Text("Форки & Сеть", fontSize = 11.sp) },
+                    icon = { Icon(Icons.Default.Lock, "Judiciary") },
+                    label = { Text("Суд", fontSize = 11.sp, fontWeight = if (activeTab == 3) FontWeight.Bold else FontWeight.Normal) },
                     colors = NavigationBarItemDefaults.colors(
-                        selectedIconColor = SpaceDark,
+                        selectedIconColor = Color.White,
+                        selectedTextColor = AccentTeal,
+                        indicatorColor = AccentTeal,
+                        unselectedIconColor = TextMuted,
+                        unselectedTextColor = TextMuted
+                    )
+                )
+                NavigationBarItem(
+                    selected = activeTab == 4,
+                    onClick = { activeTab = 4 },
+                    icon = { Icon(Icons.Default.Share, "Repository") },
+                    label = { Text("Форки", fontSize = 11.sp, fontWeight = if (activeTab == 4) FontWeight.Bold else FontWeight.Normal) },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Color.White,
                         selectedTextColor = AccentTeal,
                         indicatorColor = AccentTeal,
                         unselectedIconColor = TextMuted,
@@ -207,141 +261,36 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                 .padding(innerPadding)
                 .padding(horizontal = 12.dp)
         ) {
-            // Welcome & Current Perspective Header
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = CosmicGray),
-                elevation = CardDefaults.cardElevation(2.dp)
+            // Real-Time System Command Console (Collapsible with Animation)
+            AnimatedVisibility(
+                visible = isConsoleVisible,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut()
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Действующий Агент (Сессия):",
-                            style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                        )
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Репутация: ",
-                                style = MaterialTheme.typography.bodySmall.copy(color = TextMuted)
-                            )
-                            Text(
-                                text = "${currentAgent?.reputationScore ?: 0.0} REP",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    color = HighContrastGold,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        var expanded by remember { mutableStateOf(false) }
-
-                        Box {
-                            Text(
-                                text = "${currentAgent?.name ?: "Неизвестен"} • [${currentAgent?.role ?: ""}] ▾",
-                                color = AccentTeal,
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier
-                                    .clickable { expanded = true }
-                                    .padding(vertical = 4.dp)
-                                    .testTag("agent_selector")
-                            )
-                            DropdownMenu(
-                                expanded = expanded,
-                                onDismissRequest = { expanded = false },
-                                modifier = Modifier.background(CosmicGray)
-                            ) {
-                                agents.forEach { agent ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                "${agent.name} (${agent.reputationScore} REP - ${agent.role})",
-                                                color = if (agent.id == currentAgentId) AccentTeal else TextLight
-                                            )
-                                        },
-                                        onClick = {
-                                            viewModel.selectAgent(agent.id)
-                                            expanded = false
-                                        }
-                                    )
-                                }
-                                HorizontalDivider(color = TextMuted.copy(alpha = 0.3f))
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                Icons.Default.Add,
-                                                "Add icon",
-                                                tint = HighContrastGold,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text("Вступить/Регистрация", color = HighContrastGold, fontWeight = FontWeight.Bold)
-                                        }
-                                    },
-                                    onClick = {
-                                        showRegisterDialog = true
-                                        expanded = false
-                                    }
-                                )
-                            }
-                        }
-
-                        // Selected Fork indicator
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                Icons.Default.Share,
-                                "Fork Icon",
-                                tint = SoftCyan,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Форк: ${currentFork?.title?.replace(" (v1.0.0)", "") ?: "Ядро"}",
-                                style = MaterialTheme.typography.bodySmall.copy(color = SoftCyan)
-                            )
-                        }
-                    }
-                }
-            }
-
-            // Real-Time System Command Console
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(65.dp)
-                    .padding(bottom = 6.dp),
-                colors = CardDefaults.cardColors(containerColor = Color.Black),
-                border = BorderStroke(1.dp, AccentTeal.copy(0.3f))
-            ) {
-                LazyColumn(
+                Card(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(6.dp),
-                    reverseLayout = true
+                        .fillMaxWidth()
+                        .height(80.dp)
+                        .padding(bottom = 6.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Black),
+                    shape = RoundedCornerShape(8.dp),
+                    border = BorderStroke(1.dp, AccentTeal.copy(0.3f))
                 ) {
-                    item {
-                        Text(
-                            text = consoleOutput,
-                            color = CyberGreen,
-                            fontFamily = FontFamily.Monospace,
-                            fontSize = 11.sp,
-                            lineHeight = 14.sp
-                        )
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(8.dp),
+                        reverseLayout = true
+                    ) {
+                        item {
+                            Text(
+                                text = consoleOutput,
+                                color = CyberGreen,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp,
+                                lineHeight = 14.sp
+                            )
+                        }
                     }
                 }
             }
@@ -351,10 +300,12 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
             // Tab Content
             Box(modifier = Modifier.weight(1f)) {
                 when (activeTab) {
-                    0 -> ArchitectureTab(viewModel) { activeTab = it }
-                    1 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId)
-                    2 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId)
-                    3 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents)
+                    0 -> MindMapTab(viewModel) { destination -> activeTab = destination }
+                    1 -> ArchitectureTab(viewModel) { activeTab = 0 }
+                    2 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId) { activeTab = 0 }
+                    3 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId) { activeTab = 0 }
+                    4 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents) { activeTab = 0 }
+                    else -> MindMapTab(viewModel) { destination -> activeTab = destination }
                 }
             }
 
@@ -677,13 +628,17 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                             
                             Button(
                                 onClick = {
-                                    val uri = android.net.Uri.parse("https://myaccount.google.com/apppasswords")
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
-                                    context.startActivity(intent)
+                                    try {
+                                        val uri = android.net.Uri.parse("https://myaccount.google.com/apppasswords")
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        viewModel.showToast("Не удалось открыть браузер: ${e.message}")
+                                    }
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = AccentTeal),
-                                border = BorderStroke(1.dp, AccentTeal),
-                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(1.dp, Color(0xFFDADCE0)),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("🔗 Настройки аккаунта Google", fontSize = 11.sp)
@@ -724,6 +679,466 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                     containerColor = CosmicGray,
                     tonalElevation = 8.dp
                 )
+            }
+        }
+    }
+
+    // Left Drawer Overlay
+        AnimatedVisibility(
+            visible = isLeftDrawerOpen,
+            enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(),
+            modifier = Modifier.zIndex(100f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(0.4f))
+                    .clickable { isLeftDrawerOpen = false }
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(300.dp)
+                        .align(Alignment.CenterStart)
+                        .clickable(enabled = false) {}
+                        .shadow(16.dp),
+                    color = CosmicGray,
+                    shape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .padding(20.dp)
+                    ) {
+                        // Drawer Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(AccentTeal.copy(0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Menu Icon",
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Навигация",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextLight,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = "Social OS P2P",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        
+                        Spacer(modifier = Modifier.height(20.dp))
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.15f))
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Menu items list
+                        val menuItems = listOf(
+                            Triple("🗺️ Интерактивная Карта", "Схема связи модулей системы", 0),
+                            Triple("🏛️ Идея & Код", "Догматы ордена, архитектура & классы", 1),
+                            Triple("📋 Совет & Управа", "Дела, задачи, REP кворумы & законы", 2),
+                            Triple("⚖️ Братский Судебник", "Разборы присяжных, суверенитет", 3),
+                            Triple("📡 Связь, Ключи & Сеть", "P2P SMTP транспорт & форки", 4)
+                        )
+
+                        menuItems.forEach { (title, subtitle, index) ->
+                            val isSelected = activeTab == index
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                                    .clickable {
+                                        activeTab = index
+                                        isLeftDrawerOpen = false
+                                    },
+                                colors = CardDefaults.cardColors(
+                                    containerColor = if (isSelected) AccentTeal.copy(0.12f) else Color.Transparent
+                                ),
+                                border = if (isSelected) BorderStroke(1.dp, AccentTeal.copy(0.3f)) else null,
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(30.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(if (isSelected) AccentTeal else Color(0xFFF1F5F9)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = title.take(2),
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = title.substring(2),
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) AccentTeal else TextLight,
+                                            fontSize = 13.sp
+                                        )
+                                        Text(
+                                            text = subtitle,
+                                            color = TextMuted,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+                        
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFF1F5F9))
+                                .padding(12.dp)
+                        ) {
+                            Column {
+                                Text(
+                                    text = "P2P Взаимодействие:",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextLight,
+                                    fontSize = 11.sp
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "ИДЕЯ → ЗАДАЧИ → КОНФЛИКТЫ → СИНХРОНИЗАЦИЯ\n\nВсе компоненты жестко связаны репутационным REP-стейком участников.",
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Right Drawer Overlay
+        AnimatedVisibility(
+            visible = isRightDrawerOpen,
+            enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+            exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut(),
+            modifier = Modifier.zIndex(100f)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(0.4f))
+                    .clickable { isRightDrawerOpen = false }
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .width(300.dp)
+                        .align(Alignment.CenterEnd)
+                        .clickable(enabled = false) {}
+                        .shadow(16.dp),
+                    color = CosmicGray,
+                    shape = RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .padding(18.dp)
+                    ) {
+                        // Drawer Header
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(HighContrastGold.copy(0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Person,
+                                    contentDescription = "Profile Settings",
+                                    tint = HighContrastGold,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "Профиль и Сессия",
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextLight,
+                                    fontSize = 16.sp
+                                )
+                                Text(
+                                    text = "Права, REP и Ноды",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        HorizontalDivider(color = TextMuted.copy(alpha = 0.15f))
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Section 1: Active Agent profile
+                        Text(
+                            text = "Действующий Агент:",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        
+                        var expandedDropdown by remember { mutableStateOf(false) }
+
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { expandedDropdown = true },
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF1F5F9)),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = AccentTeal,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = currentAgent?.name ?: "Неизвестен",
+                                            color = TextLight,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                    Text("▾", color = TextMuted, fontSize = 13.sp)
+                                }
+                            }
+
+                            DropdownMenu(
+                                expanded = expandedDropdown,
+                                onDismissRequest = { expandedDropdown = false },
+                                modifier = Modifier
+                                    .width(260.dp)
+                                    .background(CosmicGray)
+                            ) {
+                                agents.forEach { agent ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Column {
+                                                Text(
+                                                    text = "${agent.name} [${agent.role}]",
+                                                    color = if (agent.id == currentAgentId) AccentTeal else TextLight,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 13.sp
+                                                )
+                                                Text(
+                                                    text = "Репутация: ${agent.reputationScore} REP",
+                                                    color = TextMuted,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        },
+                                        onClick = {
+                                            viewModel.selectAgent(agent.id)
+                                            expandedDropdown = false
+                                        }
+                                    )
+                                }
+                                HorizontalDivider(color = TextMuted.copy(alpha = 0.2f))
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Add",
+                                                tint = HighContrastGold,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Создать нового агента", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        }
+                                    },
+                                    onClick = {
+                                        showRegisterDialog = true
+                                        expandedDropdown = false
+                                    }
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        // Core Specs Info Card
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Ранг:", color = TextMuted, fontSize = 11.sp)
+                                    Text(
+                                        currentAgent?.role ?: "Абитуриент",
+                                        color = AccentTeal,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Репутация (REP):", color = TextMuted, fontSize = 11.sp)
+                                    Text(
+                                        "${currentAgent?.reputationScore ?: 0.0} REP",
+                                        color = HighContrastGold,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.ExtraBold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("Адрес:", color = TextMuted, fontSize = 11.sp)
+                                    Text(
+                                        currentAgent?.publicKey?.take(10) ?: "0x-",
+                                        fontFamily = FontFamily.Monospace,
+                                        color = TextLight,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Активный P2P Форк Кода:",
+                            color = TextMuted,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(containerColor = SoftCyan.copy(0.06f)),
+                            border = BorderStroke(1.dp, SoftCyan.copy(0.2f)),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Share,
+                                        contentDescription = null,
+                                        tint = SoftCyan,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = currentFork?.title ?: "Ядро ордена",
+                                        color = SoftCyan,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Вся переписка, законы и судебные споры закреплены за хэшем данного форка.",
+                                    color = TextMuted,
+                                    fontSize = 10.sp,
+                                    lineHeight = 13.sp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Buttons inside drawer
+                        Button(
+                            onClick = {
+                                viewModel.triggerSync()
+                                isRightDrawerOpen = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Refresh, null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Синхронизировать SMTP", fontSize = 11.sp)
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        OutlinedButton(
+                            onClick = {
+                                showRegisterDialog = true
+                                isRightDrawerOpen = false
+                            },
+                            border = BorderStroke(1.dp, HighContrastGold),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Создать новый Агент Ключ", color = HighContrastGold, fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         }
     }
@@ -771,13 +1186,13 @@ fun OnboardingWelcomeDialog(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    repeat(3) { index ->
+                    repeat(2) { index ->
                         Box(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(4.dp)
                                 .clip(RoundedCornerShape(2.dp))
-                                .background(if (index <= step) AccentTeal else CosmicGray)
+                                .background(if (index <= step) AccentTeal else SpaceDark)
                         )
                     }
                 }
@@ -811,20 +1226,6 @@ fun OnboardingWelcomeDialog(
                             lineHeight = 16.sp
                         )
                     }
-                    2 -> {
-                        Text(
-                            text = "Интерактивный Квест Сообщества",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = AccentTeal,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Пройдите 4 простых шага, чтобы разобраться:\n1️⃣ Принять присягу (зарегистрировать ID)\n2️⃣ Сделать первый выбор в Совете\n3️⃣ Ознакомиться со спором в Суде\n4️⃣ Запустить мониторинг и синхрон по P2P\n\nГотовы вступить в братство и получить первые баллы репутации?",
-                            color = TextLight,
-                            fontSize = 13.sp,
-                            lineHeight = 16.sp
-                        )
-                    }
                 }
             }
         },
@@ -834,11 +1235,11 @@ fun OnboardingWelcomeDialog(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalAlignment = Alignment.End
             ) {
-                if (step < 2) {
+                if (step < 1) {
                     Button(
                         onClick = { step++ },
                         colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                        shape = RoundedCornerShape(4.dp)
+                        shape = RoundedCornerShape(12.dp)
                     ) {
                         Text("Далее ➡️", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                     }
@@ -851,8 +1252,8 @@ fun OnboardingWelcomeDialog(
                         Button(
                             onClick = onGoogleJoin,
                             colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color(0xFF3C4043)),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.testTag("onboarding_google_join_btn")
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -864,25 +1265,11 @@ fun OnboardingWelcomeDialog(
                         Button(
                             onClick = onQuickJoin,
                             colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.testTag("onboarding_quick_join_btn")
                         ) {
                             Text("⚔️ Вступить!", fontWeight = FontWeight.Bold, fontSize = 11.sp)
-                        }
-                    }
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Button(
-                            onClick = onStartQuest,
-                            colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                            modifier = Modifier.testTag("onboarding_start_quest_btn")
-                        ) {
-                            Text("🎯 Квесты", fontWeight = FontWeight.Bold, fontSize = 11.sp)
                         }
                     }
                 }
@@ -903,79 +1290,381 @@ fun OnboardingWelcomeDialog(
             }
         },
         containerColor = CosmicGray,
+        shape = RoundedCornerShape(20.dp),
         tonalElevation = 8.dp
     )
 }
 
 // -------------------------------------------------------------
-// TAB 0: DESCRIPTION & OOP CLASS MODEL MODEL
+// INTERACTIVE SYSTEM MIND MAP (TRANSITION GRAPH)
+// -------------------------------------------------------------
+@Composable
+fun MindMapTab(
+    viewModel: SuiteViewModel,
+    onNavigate: (Int) -> Unit
+) {
+    var hoveredNode by remember { mutableStateOf(-1) }
+    
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            // Elegant Apple/Google style intro banner
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                shape = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(AccentTeal.copy(0.12f))
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "ИНТЕРАКТИВНЫЙ ГРАФ ПЕРЕХОДОВ",
+                            color = AccentTeal,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.2.sp
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Карта Системы Social OS",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextLight
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Вся архитектура децентрализованного Ордена распределена по 4 фундаментальным модулям. Нажмите на любой узел графа ниже, чтобы мгновенно перейти в соответствующий рабочий кабинет.",
+                        color = TextMuted,
+                        fontSize = 13.sp,
+                        lineHeight = 18.sp,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        }
+
+        item {
+            // Interactive Graphical Canvas & Layout
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+            ) {
+                // Background Bezier Connection Lines
+                Canvas(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .padding(start = 30.dp, top = 40.dp, bottom = 40.dp)
+                ) {
+                    val width = this.size.width
+                    val height = this.size.height
+                    
+                    // Branch line from Center Hub to other items
+                    // We draw smooth curves from left edge (x=0) to nodes on the right
+                    val path1 = Path().apply {
+                        moveTo(0f, 10f)
+                        cubicTo(width * 0.25f, 10f, width * 0.2f, height * 0.22f, width * 0.35f, height * 0.22f)
+                    }
+                    val path2 = Path().apply {
+                        moveTo(0f, 10f)
+                        cubicTo(width * 0.25f, 10f, width * 0.2f, height * 0.44f, width * 0.35f, height * 0.44f)
+                    }
+                    val path3 = Path().apply {
+                        moveTo(0f, 10f)
+                        cubicTo(width * 0.25f, 10f, width * 0.2f, height * 0.68f, width * 0.35f, height * 0.68f)
+                    }
+                    val path4 = Path().apply {
+                        moveTo(0f, 10f)
+                        cubicTo(width * 0.25f, 10f, width * 0.2f, height * 0.9f, width * 0.35f, height * 0.9f)
+                    }
+
+                    // Base connecting main line down
+                    drawLine(
+                        color = Color(0xFFCBD5E1),
+                        start = androidx.compose.ui.geometry.Offset(0f, 10f),
+                        end = androidx.compose.ui.geometry.Offset(0f, height * 0.9f),
+                        strokeWidth = 3.dp.toPx()
+                    )
+
+                    listOf(path1, path2, path3, path4).forEachIndexed { index, path ->
+                        drawPath(
+                            path = path,
+                            color = if (hoveredNode == index + 1) AccentTeal else Color(0xFFE2E8F0),
+                            style = Stroke(
+                                width = if (hoveredNode == index + 1) 4.dp.toPx() else 2.5.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        )
+                    }
+                    
+                    // Draw central connection node point
+                    drawCircle(
+                        color = AccentTeal,
+                        radius = 8.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(0f, 10f)
+                    )
+                    drawCircle(
+                        color = Color.White,
+                        radius = 4.dp.toPx(),
+                        center = androidx.compose.ui.geometry.Offset(0f, 10f)
+                    )
+                }
+
+                // Vertical list representing our interactive branches
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 22.dp), // Leaves room for the connection rail on the left
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    
+                    // CENTRAL NODE: THE CORE SOCIAL OS
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, bottom = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                        shape = RoundedCornerShape(16.dp),
+                        border = BorderStroke(2.dp, AccentTeal)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(42.6.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(AccentTeal.copy(0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "Core Kernel",
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column {
+                                Text(
+                                    text = "Ядро Social OS P2P",
+                                    color = TextLight,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    fontSize = 15.sp
+                                )
+                                Text(
+                                    text = "Автономная операционная среда узел-к-узлу",
+                                    color = TextMuted,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+
+                    // BRANCH 1: ARCHITECTURE / IDEOLOGY
+                    MindMapNodeCard(
+                        title = "🏛️ Идеология & ООП Модель",
+                        desc = "Манифест децентрализации, правила («Code is Law») и доменная модель исходного кода ядра.",
+                        nodeIndex = 1,
+                        buttonLabel = "Классовая Модель & Стек",
+                        isHovered = hoveredNode == 1,
+                        onHover = { hoveredNode = it },
+                        onClick = { onNavigate(1) }
+                    )
+
+                    // BRANCH 2: COUNCIL & TASKBOARD
+                    MindMapNodeCard(
+                        title = "📋 Законотворчество & Управа",
+                        desc = "Голосование по репутационным кворумам, создание законов и подтверждение вкладов.",
+                        nodeIndex = 2,
+                        buttonLabel = "Кабинет Голосования",
+                        isHovered = hoveredNode == 2,
+                        onHover = { hoveredNode = it },
+                        onClick = { onNavigate(2) }
+                    )
+
+                    // BRANCH 3: JUDICIARY COURT
+                    MindMapNodeCard(
+                        title = "⚖️ Братский Суд Присяжных",
+                        desc = "Разрешение технических конфликтов и спорных вкладов силами присяжных заседателей.",
+                        nodeIndex = 3,
+                        buttonLabel = "Зал Судебных Разборов",
+                        isHovered = hoveredNode == 3,
+                        onHover = { hoveredNode = it },
+                        onClick = { onNavigate(3) }
+                    )
+
+                    // BRANCH 4: P2P REPOSITORY FORKS & MAIL NETWORK
+                    MindMapNodeCard(
+                        title = "📡 Форки, Ключи & Транспорт",
+                        desc = "Синхронизация через зашифрованные SMTP/IMAP письма, форканье базы данных и настройки P2P.",
+                        nodeIndex = 4,
+                        buttonLabel = "Отдел Связи & Репозиторий",
+                        isHovered = hoveredNode == 4,
+                        onHover = { hoveredNode = it },
+                        onClick = { onNavigate(4) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun MindMapNodeCard(
+    title: String,
+    desc: String,
+    nodeIndex: Int,
+    buttonLabel: String,
+    isHovered: Boolean,
+    onHover: (Int) -> Unit,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        colors = CardDefaults.cardColors(
+            containerColor = if (isHovered) Color(0xFFF8FAFC) else CosmicGray
+        ),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(
+            width = if (isHovered) 2.dp else 1.dp,
+            color = if (isHovered) AccentTeal else Color(0xFFE2E8F0)
+        )
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = title,
+                    fontWeight = FontWeight.Bold,
+                    color = AccentTeal,
+                    fontSize = 14.sp
+                )
+                Icon(
+                    imageVector = Icons.Default.ArrowForward,
+                    contentDescription = null,
+                    tint = AccentTeal.copy(0.7f),
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = desc,
+                color = TextLight,
+                fontSize = 12.sp,
+                lineHeight = 16.sp
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+            Button(
+                onClick = onClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (isHovered) AccentTeal else AccentTeal.copy(0.08f),
+                    contentColor = if (isHovered) Color.White else AccentTeal
+                ),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(text = buttonLabel, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// -------------------------------------------------------------
+// TAB 1: DESCRIPTION & OOP CLASS MODEL MODEL
 // -------------------------------------------------------------
 @Composable
 fun ArchitectureTab(
     viewModel: SuiteViewModel,
     onSwitchTab: (Int) -> Unit
 ) {
-    var subTab by remember { mutableStateOf(0) } // 0: Быстрый Старт, 1: Институты, 2: Классовая Модель, 3: P2P Стек
-
-    val mRegistered by viewModel.missionRegistered.collectAsState()
-    val mVoted by viewModel.missionVoted.collectAsState()
-    val mDispute by viewModel.missionDispute.collectAsState()
-    val mSynced by viewModel.missionSynced.collectAsState()
+    var subTab by remember { mutableStateOf(0) } // 0: Институты, 1: Классовая Модель, 2: P2P Стек
 
     Column(modifier = Modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(bottom = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Button(
-                onClick = { subTab = 0 },
-                modifier = Modifier.weight(1.1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (subTab == 0) AccentTeal else CosmicGray,
-                    contentColor = if (subTab == 0) SpaceDark else TextLight
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(4.dp)
+            IconButton(
+                onClick = { onSwitchTab(0) },
+                modifier = Modifier.size(32.dp)
             ) {
-                Text("🚀 Старт", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Icon(
+                    imageVector = Icons.Default.ArrowBack,
+                    contentDescription = "Back to map",
+                    tint = AccentTeal
+                )
             }
-            Button(
-                onClick = { subTab = 1 },
-                modifier = Modifier.weight(1.1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (subTab == 1) AccentTeal else CosmicGray,
-                    contentColor = if (subTab == 1) SpaceDark else TextLight
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(4.dp)
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+                text = "← НАЗАД К КАРТЕ ПЕРЕХОДОВ СИСТЕМЫ",
+                color = AccentTeal,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.clickable { onSwitchTab(0) }
+            )
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Text("🏛️ Институты", fontSize = 10.sp)
-            }
-            Button(
-                onClick = { subTab = 2 },
-                modifier = Modifier.weight(1.1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (subTab == 2) AccentTeal else CosmicGray,
-                    contentColor = if (subTab == 2) SpaceDark else TextLight
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text("💻 Классы", fontSize = 10.sp)
-            }
-            Button(
-                onClick = { subTab = 3 },
-                modifier = Modifier.weight(1.1f),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (subTab == 3) AccentTeal else CosmicGray,
-                    contentColor = if (subTab == 3) SpaceDark else TextLight
-                ),
-                contentPadding = PaddingValues(horizontal = 2.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                Text("📡 P2P Стек", fontSize = 10.sp)
+                listOf(
+                    "🏛️ Институты",
+                    "💻 Классы",
+                    "📡 P2P Стек"
+                ).forEachIndexed { index, label ->
+                    val isSelected = subTab == index
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (isSelected) AccentTeal else Color.Transparent)
+                            .clickable { subTab = index }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (isSelected) SpaceDark else TextLight,
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
             }
         }
 
@@ -988,9 +1677,10 @@ fun ArchitectureTab(
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
                             colors = CardDefaults.cardColors(containerColor = CosmicGray),
-                            border = BorderStroke(1.dp, AccentTeal.copy(alpha = 0.4f))
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(16.dp)) {
                                 Text(
                                     "🌌 ДОБРО ПОЖАЛОВАТЬ В ОТКРЫТЫЙ ОРДЕН!",
                                     style = MaterialTheme.typography.titleMedium,
@@ -1001,334 +1691,22 @@ fun ArchitectureTab(
                                 Text(
                                     "Вы зашли в Social OS — децентрализованную цифровую республику со встроенным репутационным суверенитетом. Здесь нет ни одного централизованного сервера: все решения синхронизируются пир-ту-пир прямо поверх электронной почты.",
                                     color = TextLight,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Пройдите увлекательный Интерактивный Квест Сообщества, чтобы понять, как устроена цифровая власть, заслужить первые очки репутации (REP) и влиться в братство!",
-                                    color = SoftCyan,
-                                    fontSize = 12.sp,
-                                    lineHeight = 16.sp
-                                )
-                                Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    TextButton(
-                                        onClick = { viewModel.resetOnboarding() },
-                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
-                                        modifier = Modifier.height(28.dp).testTag("reopen_onboarding_btn")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = AccentTeal,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Повторить презентацию", color = AccentTeal, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Progress Tracker Bar
-                    item {
-                        val completedCount = (if (mRegistered) 1 else 0) + 
-                                             (if (mVoted) 1 else 0) + 
-                                             (if (mDispute) 1 else 0) + 
-                                             (if (mSynced) 1 else 0)
-                        
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color.Black),
-                            border = BorderStroke(1.dp, CosmicGray)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "🏆 Прогресс Квеста Новичка:",
-                                        color = TextLight,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                    Text(
-                                        "$completedCount из 4 закладок",
-                                        color = if (completedCount == 4) CyberGreen else HighContrastGold,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
-                                    )
-                                }
                                 Spacer(modifier = Modifier.height(6.dp))
-                                LinearProgressIndicator(
-                                    progress = { completedCount / 4.0f },
-                                    modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
-                                    color = if (completedCount == 4) CyberGreen else AccentTeal,
-                                    trackColor = CosmicGray
-                                )
-                            }
-                        }
-                    }
-
-                    // Mission 1 Card
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.AccountCircle,
-                                            contentDescription = null,
-                                            tint = if (mRegistered) CyberGreen else HighContrastGold,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Шаг 1: Принять присягу (Создать ID)",
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentTeal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    if (mRegistered) {
-                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission1_done"))
-                                    } else {
-                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission1_pending"))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    "Создайте собственный суверенный P2P крипто-идентификатор в формате user@orden.p2p и подпишите общественный договор.",
-                                    color = TextLight,
-                                    fontSize = 12.sp
+                                    "Ниже описаны фундаментальные алгоритмические институты (Code is Law), управляющие нашей децентрализованной средой.",
+                                    color = SoftCyan,
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
                                 )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    Button(
-                                        onClick = {
-                                            viewModel.registerAgent(
-                                                id = "leonid_yasin@orden.p2p",
-                                                name = "Леонид Ясин (Рекрут)",
-                                                role = "Knight"
-                                            )
-                                        },
-                                        colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                                        modifier = Modifier.weight(1f).height(36.dp).testTag("quick_join_btn"),
-                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text("⚔️ Вступить в 1 клик", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    
-                                    OutlinedButton(
-                                        onClick = {
-                                            onSwitchTab(3) // Switch to tab 3 to configure
-                                        },
-                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = TextLight),
-                                        border = BorderStroke(1.dp, TextMuted),
-                                        modifier = Modifier.weight(1f).height(36.dp),
-                                        contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                        shape = RoundedCornerShape(4.dp)
-                                    ) {
-                                        Text("⚙️ Полная настройка", fontSize = 11.sp)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Mission 2 Card
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.CheckCircle,
-                                            contentDescription = null,
-                                            tint = if (mVoted) CyberGreen else HighContrastGold,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Шаг 2: Первый голос в Совете",
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentTeal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    if (mVoted) {
-                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission2_done"))
-                                    } else {
-                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission2_pending"))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Влияйте на законодательство Ордена! Ознакомьтесь с 'Принятием Хартии Цифрового Суверенитета' и отдайте свой голос за или против.",
-                                    color = TextLight,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { onSwitchTab(1) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (mVoted) CosmicGray else HighContrastGold, contentColor = SpaceDark),
-                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("go_to_council_btn"),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text("🗳️ Перейти к Голосованию", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (mVoted) TextLight else SpaceDark)
-                                }
-                            }
-                        }
-                    }
-
-                    // Mission 3 Card
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Warning,
-                                            contentDescription = null,
-                                            tint = if (mDispute) CyberGreen else HighContrastGold,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Шаг 3: Судейское правосудие",
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentTeal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    if (mDispute) {
-                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission3_done"))
-                                    } else {
-                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission3_pending"))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "В Ордене нет полиции — порядок поддерживают сами участники. Примите участие в рассмотрении конституционного спора dispute-001 в качестве присяжного.",
-                                    color = TextLight,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { onSwitchTab(2) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = if (mDispute) CosmicGray else HighContrastGold, contentColor = SpaceDark),
-                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("go_to_court_btn"),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text("⚖️ Открыть Судебные Тяжбы", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (mDispute) TextLight else SpaceDark)
-                                }
-                            }
-                        }
-                    }
-
-                    // Mission 4 Card
-                    item {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
-                        ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Email,
-                                            contentDescription = null,
-                                            tint = if (mSynced) CyberGreen else HighContrastGold,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            "Шаг 4: Синхронизировать узлы по P2P",
-                                            fontWeight = FontWeight.Bold,
-                                            color = AccentTeal,
-                                            fontSize = 13.sp
-                                        )
-                                    }
-                                    if (mSynced) {
-                                        Text("🏆 ВЫПОЛНЕНО", color = CyberGreen, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission4_done"))
-                                    } else {
-                                        Text("⏳ ОЖИДАЕТ", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.testTag("mission4_pending"))
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "Запустите протокол слияния данных, который опросит вашу overlay-почту или симулирует P2P-сеть для получения последних дельт репутации.",
-                                    color = TextLight,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Button(
-                                    onClick = { viewModel.triggerSync() },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                                    modifier = Modifier.fillMaxWidth().height(36.dp).testTag("trigger_sync_quest_btn"),
-                                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp),
-                                    shape = RoundedCornerShape(4.dp)
-                                ) {
-                                    Text("📡 Запустить Мониторинг Сети", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
                             }
                         }
                     }
 
                     item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                    }
-                }
-                1 -> {
-                    item {
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
                             "АРХИТЕКТУРНЫЕ ИНСТИТУТЫ (Social OS)",
                             style = MaterialTheme.typography.titleMedium,
@@ -1347,25 +1725,27 @@ fun ArchitectureTab(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                                .padding(vertical = 6.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(inst.icon, contentDescription = inst.title, tint = AccentTeal, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(inst.title, fontWeight = FontWeight.Bold, color = AccentTeal, fontSize = 15.sp)
                                 }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(inst.desc, color = TextLight, fontSize = 13.sp)
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(inst.desc, color = TextLight, fontSize = 13.sp, lineHeight = 18.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
                                 Text("Логика Закона:", color = HighContrastGold, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                 Text(inst.rule, color = SoftCyan, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
                 }
-                2 -> {
+                1 -> {
                     item {
                         Text(
                             "КЛАССОВАЯ МОДЕЛЬ ООП (Чистая Архитектура)",
@@ -1385,28 +1765,29 @@ fun ArchitectureTab(
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFF070A0F)),
-                            border = BorderStroke(1.dp, CosmicGray)
+                                .padding(vertical = 6.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Text(codeM.className, color = AccentTeal, fontWeight = FontWeight.Bold, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
                                 Text(codeM.meta, color = TextMuted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
                                 Text(
                                     codeM.methods,
-                                    color = SoftCyan,
+                                    color = Color(0xFF0F172A),
                                     fontSize = 11.sp,
                                     fontFamily = FontFamily.Monospace,
                                     modifier = Modifier
-                                        .background(Color.Black.copy(0.4f))
-                                        .padding(6.dp)
+                                        .background(Color(0xFFF1F5F9))
+                                        .padding(8.dp)
                                         .fillMaxWidth()
                                 )
                             }
                         }
                     }
                 }
-                3 -> {
+                2 -> {
                     item {
                         Text(
                             "P2P ЯДРО СИНХРОНИЗАЦИИ SMTP / IMAP",
@@ -1418,14 +1799,17 @@ fun ArchitectureTab(
                         Text(
                             "Для связи вне цензуры Открытый Орден использует зашифрованные SMTP/IMAP сообщения в качестве P2P транспорта. Каждый узел — это автономный почтовый клиент, а роль DNS-маршрутизаторов играет глобальная цепочка email-провайдеров.",
                             color = TextLight,
-                            fontSize = 13.sp
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Text("💡 Стек Рекомендуемых Технологий Android:", fontWeight = FontWeight.Bold, color = AccentTeal, fontSize = 14.sp)
                                 Spacer(modifier = Modifier.height(6.dp))
                                 val techList = listOf(
@@ -1445,16 +1829,19 @@ fun ArchitectureTab(
                         }
                         Card(
                             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                            colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                            border = BorderStroke(1.dp, Color(0xFFE2E8F0))
                         ) {
-                            Column(modifier = Modifier.padding(10.dp)) {
+                            Column(modifier = Modifier.padding(14.dp)) {
                                 Text("🔄 Конфликтология Межсетевого Обмена:", fontWeight = FontWeight.Bold, color = AccentTeal, fontSize = 14.sp)
                                 Spacer(modifier = Modifier.height(4.dp))
                                 Text(
                                     "Каждое решение (Proposal) пакуется как JSON, шифруется, подписывается асимметричным Ed25519-ключом узла и высылается как SMTP-конверт.\n\n" +
                                     "При получении (IMAP), узел верифицирует репутационный вес отправителя на момент отправки и накатывает дельту: если голоса перешли Рубикон, локальные триггеры генерируют задачи управления автоматически.",
                                     color = TextLight,
-                                    fontSize = 13.sp
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
                                 )
                             }
                         }
@@ -1474,13 +1861,42 @@ fun CouncilAndTasksTab(
     proposals: List<ProposalEntity>,
     tasks: List<TaskEntity>,
     currentAgentId: String,
-    selectedForkId: String
+    selectedForkId: String,
+    onBackToMap: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var newTitle by remember { mutableStateOf("") }
     var newDesc by remember { mutableStateOf("") }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBackToMap,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back to map",
+                        tint = AccentTeal
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "← НАЗАД К КАРТЕ ПЕРЕХОДОВ СИСТЕМЫ",
+                    color = AccentTeal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onBackToMap() }
+                )
+            }
+        }
+
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1496,12 +1912,13 @@ fun CouncilAndTasksTab(
                 Button(
                     onClick = { showCreateDialog = true },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     modifier = Modifier.testTag("create_proposal_btn")
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text("Создать", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Создать", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(
@@ -1529,18 +1946,19 @@ fun CouncilAndTasksTab(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 6.dp),
                 colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                shape = RoundedCornerShape(16.dp),
                 border = BorderStroke(
                     width = 1.dp,
                     color = when (proposal.status) {
                         "ACCEPTED" -> CyberGreen.copy(0.4f)
                         "REJECTED" -> AlertRed.copy(0.4f)
-                        else -> AccentTeal.copy(0.2f)
+                        else -> Color(0xFFE2E8F0)
                     }
                 )
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1554,7 +1972,7 @@ fun CouncilAndTasksTab(
                         )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     when (proposal.status) {
                                         "ACCEPTED" -> CyberGreen.copy(0.15f)
@@ -1562,7 +1980,7 @@ fun CouncilAndTasksTab(
                                         else -> AccentTeal.copy(0.15f)
                                     }
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = when (proposal.status) {
@@ -1581,11 +1999,11 @@ fun CouncilAndTasksTab(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(proposal.title, fontWeight = FontWeight.Bold, color = TextLight, fontSize = 14.sp)
                     Text(proposal.description, color = TextLight, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
                     val totalWeight = proposal.voteYesRep + proposal.voteNoRep
                     val yesProgress = if (totalWeight > 0) (proposal.voteYesRep / totalWeight).toFloat() else 0f
@@ -1610,9 +2028,9 @@ fun CouncilAndTasksTab(
                                 fontWeight = FontWeight.Bold
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         LinearProgressIndicator(
-                            progress = yesProgress,
+                            progress = { yesProgress },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(6.dp)
@@ -1620,7 +2038,7 @@ fun CouncilAndTasksTab(
                             color = CyberGreen,
                             trackColor = AlertRed
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = quorumText,
                             style = MaterialTheme.typography.bodySmall.copy(color = TextMuted, fontSize = 10.sp)
@@ -1628,7 +2046,7 @@ fun CouncilAndTasksTab(
                     }
 
                     if (proposal.status == "ACTIVE") {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.End,
@@ -1636,27 +2054,27 @@ fun CouncilAndTasksTab(
                         ) {
                             Button(
                                 onClick = { viewModel.castVote(proposal.id, true) },
-                                colors = ButtonDefaults.buttonColors(containerColor = CyberGreen.copy(0.2f), contentColor = CyberGreen),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = CyberGreen.copy(0.12f), contentColor = CyberGreen),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier
                                     .padding(end = 6.dp)
                                     .testTag("vote_yes_${proposal.id}")
                             ) {
                                 Icon(Icons.Default.ThumbUp, contentDescription = null, modifier = Modifier.size(12.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("ЗА", fontSize = 11.sp)
+                                Text("ЗА", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                             Button(
                                 onClick = { viewModel.castVote(proposal.id, false) },
-                                colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(0.2f), contentColor = AlertRed),
-                                shape = RoundedCornerShape(4.dp),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(0.12f), contentColor = AlertRed),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                 modifier = Modifier.testTag("vote_no_${proposal.id}")
                             ) {
                                 Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(12.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("ПРОТИВ", fontSize = 11.sp)
+                                Text("ПРОТИВ", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -1692,10 +2110,12 @@ fun CouncilAndTasksTab(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                colors = CardDefaults.cardColors(containerColor = CosmicGray)
+                    .padding(vertical = 6.dp),
+                colors = CardDefaults.cardColors(containerColor = CosmicGray),
+                shape = RoundedCornerShape(16.dp),
+                border = BorderStroke(1.dp, Color(0xFFE2E8F0))
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1709,11 +2129,11 @@ fun CouncilAndTasksTab(
                         )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     if (task.status == "AUDITED") CyberGreen.copy(0.15f) else SoftCyan.copy(0.15f)
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = if (task.status == "AUDITED") "ВЫПОЛНЕНО & АУДИРОВАНО" else "НА ЭТАПЕ ВЫПОЛНЕНИЯ",
@@ -1724,23 +2144,23 @@ fun CouncilAndTasksTab(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(task.title, fontWeight = FontWeight.Bold, color = TextLight, fontSize = 14.sp)
                     Text(task.description, color = TextLight, fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
 
                     if (task.status != "AUDITED") {
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         Button(
                             onClick = { viewModel.completeTask(task.id) },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                            shape = RoundedCornerShape(4.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                             modifier = Modifier.align(Alignment.End).testTag("complete_task_${task.id}")
                         ) {
                             Text("Сделать Вклад (Закрыть задачу)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
                     } else {
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = "Освоено агентом: ${task.assignedTo ?: "Неизвестно"}",
                             style = MaterialTheme.typography.bodySmall.copy(color = TextMuted, fontSize = 10.sp)
@@ -1818,7 +2238,8 @@ fun JudiciaryTab(
     viewModel: SuiteViewModel,
     disputes: List<DisputeEntity>,
     agents: List<AgentEntity>,
-    currentAgentId: String
+    currentAgentId: String,
+    onBackToMap: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var selectedDefendant by remember { mutableStateOf("") }
@@ -1826,6 +2247,34 @@ fun JudiciaryTab(
     var selectedArticle by remember { mutableStateOf("Раздел I. Отрез 1 (Национальный суверенитет)") }
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBackToMap,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back to map",
+                        tint = AccentTeal
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "← НАЗАД К КАРТЕ ПЕРЕХОДОВ СИСТЕМЫ",
+                    color = AccentTeal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onBackToMap() }
+                )
+            }
+        }
+
         item {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
@@ -1844,12 +2293,13 @@ fun JudiciaryTab(
                         showCreateDialog = true 
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     modifier = Modifier.testTag("raise_dispute_btn")
                 ) {
                     Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Text("Заявить иск", fontSize = 12.sp)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Заявить иск", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
             Text(
@@ -1872,14 +2322,15 @@ fun JudiciaryTab(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                    .padding(vertical = 6.dp),
+                shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = CosmicGray),
                 border = BorderStroke(
                     1.dp,
-                    if (dispute.status == "RESOLVED_YES") AlertRed.copy(0.4f) else AccentTeal.copy(0.2f)
+                    if (dispute.status == "RESOLVED_YES") AlertRed.copy(0.4f) else Color(0xFFE2E8F0)
                 )
             ) {
-                Column(modifier = Modifier.padding(10.dp)) {
+                Column(modifier = Modifier.padding(14.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -1893,7 +2344,7 @@ fun JudiciaryTab(
                         )
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
+                                .clip(RoundedCornerShape(12.dp))
                                 .background(
                                     when (dispute.status) {
                                         "RESOLVED_YES" -> AlertRed.copy(0.15f)
@@ -1901,7 +2352,7 @@ fun JudiciaryTab(
                                         else -> AccentTeal.copy(0.15f)
                                     }
                                 )
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
                                 text = when (dispute.status) {
@@ -1920,7 +2371,7 @@ fun JudiciaryTab(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "Истец: ${dispute.plaintiffId}  ->  Обвиняемый: ${dispute.defendantId}",
                         color = SoftCyan,
@@ -1934,7 +2385,7 @@ fun JudiciaryTab(
                         modifier = Modifier.padding(top = 4.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Судейская Коллегия (Jury IDs): [${dispute.juryIds.replace(",", ", ")}]",
                         color = TextMuted,
@@ -1953,14 +2404,14 @@ fun JudiciaryTab(
                     val isJuror = juryList.contains(currentAgentId)
 
                     if (dispute.status == "REVIEW" && isJuror) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "Вы назначены судьей присяжных:",
+                                "Вы назначены присяжным:",
                                 color = HighContrastGold,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -1968,21 +2419,21 @@ fun JudiciaryTab(
                             Row {
                                 Button(
                                     onClick = { viewModel.castJuryVote(dispute.id, true) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(0.2f), contentColor = AlertRed),
-                                    shape = RoundedCornerShape(4.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = AlertRed.copy(0.12f), contentColor = AlertRed),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     modifier = Modifier.padding(end = 4.dp).testTag("jury_guilty_${dispute.id}")
                                 ) {
-                                    Text("ВИНОВЕН", fontSize = 11.sp)
+                                    Text("ВИНОВЕН", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 Button(
                                     onClick = { viewModel.castJuryVote(dispute.id, false) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen.copy(0.2f), contentColor = CyberGreen),
-                                    shape = RoundedCornerShape(4.dp),
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = CyberGreen.copy(0.12f), contentColor = CyberGreen),
+                                    shape = RoundedCornerShape(12.dp),
+                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                                     modifier = Modifier.testTag("jury_innocent_${dispute.id}")
                                 ) {
-                                    Text("ОПРАВДАН", fontSize = 11.sp)
+                                    Text("ОПРАВДАН", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -2114,7 +2565,8 @@ fun RepositoryForksTab(
     forks: List<ForkEntity>,
     syncLogs: List<SyncLogEntity>,
     selectedForkId: String,
-    agents: List<AgentEntity>
+    agents: List<AgentEntity>,
+    onBackToMap: () -> Unit
 ) {
     var showCreateDialog by remember { mutableStateOf(false) }
     var forkIdInput by remember { mutableStateOf("") }
@@ -2150,6 +2602,34 @@ fun RepositoryForksTab(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onBackToMap,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back to map",
+                        tint = AccentTeal
+                    )
+                }
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "← НАЗАД К КАРТЕ ПЕРЕХОДОВ СИСТЕМЫ",
+                    color = AccentTeal,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onBackToMap() }
+                )
+            }
+        }
+
         item {
             Card(
                 modifier = Modifier
@@ -2222,7 +2702,7 @@ fun RepositoryForksTab(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).testTag("import_peer_btn")
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -2248,8 +2728,8 @@ fun RepositoryForksTab(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = HighContrastGold),
-                            border = BorderStroke(1.dp, HighContrastGold),
-                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(1.dp, HighContrastGold.copy(0.5f)),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f).testTag("copy_my_invite_btn")
                         ) {
                             Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp), tint = HighContrastGold)
@@ -2489,7 +2969,7 @@ fun RepositoryForksTab(
                                     )
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                                shape = RoundedCornerShape(4.dp),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Сохранить", fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -2500,8 +2980,8 @@ fun RepositoryForksTab(
                                     viewModel.testMailConnection()
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = HighContrastGold),
-                                border = BorderStroke(1.dp, HighContrastGold),
-                                shape = RoundedCornerShape(4.dp),
+                                border = BorderStroke(1.dp, HighContrastGold.copy(0.5f)),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.weight(1f)
                             ) {
                                 Text("Проверить линк", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = HighContrastGold)
@@ -2527,8 +3007,8 @@ fun RepositoryForksTab(
                 Button(
                     onClick = { showCreateDialog = true },
                     colors = ButtonDefaults.buttonColors(containerColor = AccentTeal, contentColor = SpaceDark),
-                    shape = RoundedCornerShape(4.dp),
-                    contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
                     modifier = Modifier.testTag("create_fork_btn")
                 ) {
                     Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -2771,9 +3251,9 @@ fun RepositoryForksTab(
                             Button(
                                 onClick = { showRecipientDropdown = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = CosmicGray, contentColor = TextLight),
-                                shape = RoundedCornerShape(4.dp),
-                                border = BorderStroke(1.dp, TextMuted.copy(alpha = 0.5f)),
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, TextMuted.copy(alpha = 0.3f)),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
                                 modifier = Modifier.height(48.dp)
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2827,7 +3307,7 @@ fun RepositoryForksTab(
                                 focusedTextColor = TextLight,
                                 unfocusedTextColor = TextLight
                             ),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(12.dp),
                             singleLine = true,
                             modifier = Modifier
                                 .weight(1f)
@@ -2844,7 +3324,7 @@ fun RepositoryForksTab(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
-                            shape = RoundedCornerShape(4.dp),
+                            shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(0.dp),
                             modifier = Modifier
                                 .size(48.dp)
@@ -2877,7 +3357,7 @@ fun RepositoryForksTab(
                 Button(
                     onClick = { viewModel.triggerSync() },
                     colors = ButtonDefaults.buttonColors(containerColor = CyberGreen, contentColor = SpaceDark),
-                    shape = RoundedCornerShape(4.dp),
+                    shape = RoundedCornerShape(12.dp),
                     modifier = Modifier.padding(start = 8.dp).testTag("simulate_sync_action")
                 ) {
                     Text("Синхронизировать", fontSize = 11.sp, fontWeight = FontWeight.Bold)
