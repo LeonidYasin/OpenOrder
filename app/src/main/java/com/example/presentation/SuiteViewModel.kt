@@ -462,4 +462,262 @@ class SuiteViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
     }
+
+    data class CliLog(val text: String, val type: String = "info")
+
+    private val _cliLogs = MutableStateFlow<List<CliLog>>(listOf(
+        CliLog("Добро пожаловать в P2P CLI консоль 'ОТКРЫТЫЙ ОРДЕН'!", "info"),
+        CliLog("Командный интерфейс готов к приему директив социальной ОС.", "info"),
+        CliLog("Введите 'help' для вывода списка доступных инструкций.", "help")
+    ))
+    val cliLogs: StateFlow<List<CliLog>> = _cliLogs.asStateFlow()
+
+    fun executeCliCommand(rawCommand: String) {
+        val trimmed = rawCommand.trim()
+        if (trimmed.isEmpty()) return
+        
+        _cliLogs.value = _cliLogs.value + CliLog("agent@p2p:~$ $trimmed", "command")
+        
+        val parts = trimmed.split(Regex("\\s+"))
+        if (parts.isEmpty()) return
+        val cmd = parts[0].lowercase()
+        
+        try {
+            when (cmd) {
+                "help" -> {
+                    val helpText = """
+                        --- ДОСТУПНЫЕ ИНСТРУКЦИИ ОРДЕНА ---
+                        • status, info - Состояние пирингового ядра и метрики узла
+                        • register <id> | <name> | <role> | [rep] - Добавить нового соратника
+                        • login <id> - Авторизоваться/переключить активную сессию
+                        • proposal <title> | <description> - Выдвинуть предложение в совет
+                        • vote <propId> <yes/no> - Проголосовать за/против предложение
+                        • task <taskId> done - Отметить выполнение выданного поручения
+                        • dispute <defendantId> | <description> | <article> - Открыть дело в Суде Чести
+                        • juryvote <disputeId> <guilty/innocent> - Голосовать вердиктом присяжного
+                        • fork <id> <title> | <description> - Создать новую редакцию/ветку правил
+                        • selectfork <id> - Перейти на выбранную редакцию документов
+                        • msg <recipientEmail> | <text> - Послать P2P шифрованный email-пакет
+                        • sync - Инициировать ручной обмен транзакциями с оверлеем
+                        • simulation <on/off> - Включить автоматизированную симуляцию
+                        • mailconfig <smtpH> <smtpPort> <imapH> <imapPort> <usr> <pas> <ssl> - Быстрые настройки
+                        • clear - Очистить буфер вывода терминала
+                    """.trimIndent()
+                    _cliLogs.value = _cliLogs.value + CliLog(helpText, "help")
+                }
+                "clear" -> {
+                    _cliLogs.value = emptyList()
+                }
+                "status", "info" -> {
+                    val activeAgent = _currentAgentId.value
+                    val curFork = _selectedForkId.value
+                    val agentsCount = agents.value.size
+                    val propsCount = proposals.value.size
+                    val disputesCount = disputes.value.size
+                    val tasksCount = tasks.value.count { it.status != "COMPLETED" }
+                    val isSim = if (_isSimulationEnabled.value) "АКТИВНА" else "ОТКЛЮЧЕНА (прямая почта)"
+                    
+                    val statusText = """
+                        --- СТАТУС ВЕТВИ АКТУАЛЬНОСТИ ОРДЕНА ---
+                        • Текущий агент: $activeAgent
+                        • Контекст ветки репозитория: $curFork
+                        • Подписчиков в локальном реестре: $agentsCount
+                        • Законопроектов на голосовании: $propsCount
+                        • Рассматриваемых споров: $disputesCount
+                        • Поручений в работе: $tasksCount
+                        • Симуляция распределенной сети: $isSim
+                    """.trimIndent()
+                    _cliLogs.value = _cliLogs.value + CliLog(statusText, "info")
+                }
+                "register" -> {
+                    val argString = if (trimmed.length > 8) trimmed.substring(8).trim() else ""
+                    val args = if (argString.contains("|")) {
+                        argString.split("|").map { it.trim() }
+                    } else {
+                        val matches = Regex("""[^\s"']+|"([^"]*)"|'([^']*)'""").findAll(argString)
+                        matches.map { 
+                            val s = it.value
+                            if ((s.startsWith("\"") && s.endsWith("\"")) || (s.startsWith("'") && s.endsWith("'"))) {
+                                s.substring(1, s.length - 1)
+                            } else {
+                                s
+                            }
+                        }.toList()
+                    }
+                    
+                    if (args.size < 3) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Недостаточно аргументов!\nОжидается: register <id> | <name> | <role> | [reputation]", "error")
+                    } else {
+                        val id = args[0]
+                        val name = args[1]
+                        val role = args[2]
+                        val initialRep = args.getOrNull(3)?.toDoubleOrNull() ?: 20.0
+                        registerAgent(id, name, role, initialRep, autoLogin = true)
+                        _cliLogs.value = _cliLogs.value + CliLog("Успешно: агент зарегистрирован и авторизован. Имя: $name, ID: $id, Роль: $role, Престиж: $initialRep REP.", "success")
+                    }
+                }
+                "login" -> {
+                    if (parts.size < 2) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: укажите целевой ID. Пример: login ivan@orden.p2p", "error")
+                    } else {
+                        val targetId = parts[1]
+                        val found = agents.value.any { it.id == targetId }
+                        if (found) {
+                            selectAgent(targetId)
+                            _cliLogs.value = _cliLogs.value + CliLog("Успешно: Сессия переключена на локальный узел $targetId", "success")
+                        } else {
+                            _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Агента с ID '$targetId' нет в локальном реестре.", "error")
+                        }
+                    }
+                }
+                "proposal" -> {
+                    val argString = if (trimmed.length > 8) trimmed.substring(8).trim() else ""
+                    val args = if (argString.contains("|")) argString.split("|").map { it.trim() } else listOf(argString)
+                    
+                    if (args[0].isBlank()) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: введите тему (название). Пример: proposal Название предл. | Описание сути", "error")
+                    } else {
+                        val title = args[0]
+                        val description = args.getOrNull(1) ?: "Выдвинуто из CLI терминала"
+                        createProposal(title, description)
+                        _cliLogs.value = _cliLogs.value + CliLog("Успешно: Предложение '$title' зарегистрировано в совете.", "success")
+                    }
+                }
+                "vote" -> {
+                    if (parts.size < 3) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: формат: vote <propId> <yes/no>", "error")
+                    } else {
+                        val propId = parts[1]
+                        val voteStr = parts[2].lowercase()
+                        if (voteStr == "yes" || voteStr == "no" || voteStr == "да" || voteStr == "нет") {
+                            val votedYes = voteStr == "yes" || voteStr == "да"
+                            castVote(propId, votedYes)
+                            _cliLogs.value = _cliLogs.value + CliLog("Успешно: Голос за предложение $propId учтен как [${if (votedYes) "ЗА" else "ПРОТИВ"}].", "success")
+                        } else {
+                            _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Голос должен быть yes (да) или no (нет).", "error")
+                        }
+                    }
+                }
+                "task" -> {
+                    if (parts.size < 3 || parts[2].lowercase() != "done") {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: формат: task <taskId> done", "error")
+                    } else {
+                        val taskId = parts[1]
+                        val exists = tasks.value.any { it.id == taskId }
+                        if (exists) {
+                            completeTask(taskId)
+                            _cliLogs.value = _cliLogs.value + CliLog("Успешно: Задача '$taskId' завершена.", "success")
+                        } else {
+                            _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Задача с ID '$taskId' отсутствует.", "error")
+                        }
+                    }
+                }
+                "dispute" -> {
+                    val argString = if (trimmed.length > 7) trimmed.substring(7).trim() else ""
+                    val args = if (argString.contains("|")) argString.split("|").map { it.trim() } else listOf(argString)
+                    
+                    if (args.size < 3) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Ожидается: dispute defendantId | description | article", "error")
+                    } else {
+                        val defId = args[0]
+                        val desc = args[1]
+                        val art = args[2]
+                        raiseDispute(defId, desc, art)
+                        _cliLogs.value = _cliLogs.value + CliLog("Успешно: Иск подан против $defId за нарушение статьи '$art'.", "success")
+                    }
+                }
+                "juryvote" -> {
+                    if (parts.size < 3) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: формат: juryvote <disputeId> <guilty/innocent>", "error")
+                    } else {
+                        val disputeId = parts[1]
+                        val verdict = parts[2].lowercase()
+                        if (verdict == "guilty" || verdict == "innocent" || verdict == "виновен" || verdict == "невиновен") {
+                            val isGuilty = verdict == "guilty" || verdict == "виновен"
+                            castJuryVote(disputeId, isGuilty)
+                            _cliLogs.value = _cliLogs.value + CliLog("Успешно: Решение для дела $disputeId: [${if (isGuilty) "ВИНОВЕН" else "НЕВИНОВЕН"}] добавлено в протокол.", "success")
+                        } else {
+                            _cliLogs.value = _cliLogs.value + CliLog("Ошибка: вердикт должен быть 'guilty' или 'innocent'.", "error")
+                        }
+                    }
+                }
+                "fork" -> {
+                    val argString = if (trimmed.length > 4) trimmed.substring(4).trim() else ""
+                    val partition = argString.split(" ", limit = 2)
+                    if (partition.size < 2) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: формат: fork <newForkId> <title> | [description]", "error")
+                    } else {
+                        val forkId = partition[0]
+                        val rest = partition[1]
+                        val subArgs = if (rest.contains("|")) rest.split("|").map { it.trim() } else listOf(rest)
+                        val title = subArgs[0]
+                        val desc = subArgs.getOrNull(1) ?: "Форк создан автономно"
+                        createFork(forkId, title, desc, 1.0, 10.0)
+                        _cliLogs.value = _cliLogs.value + CliLog("Успешно: Созван форк правил социальной ОС: '$title' ($forkId).", "success")
+                    }
+                }
+                "selectfork" -> {
+                    if (parts.size < 2) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: укажите forkId.", "error")
+                    } else {
+                        val forkId = parts[1]
+                        val found = forks.value.any { it.id == forkId }
+                        if (found) {
+                            selectFork(forkId)
+                            _cliLogs.value = _cliLogs.value + CliLog("Успешно: контекст переключен на правила '$forkId'", "success")
+                        } else {
+                            _cliLogs.value = _cliLogs.value + CliLog("Ошибка: форк с ID '$forkId' не обнаружен.", "error")
+                        }
+                    }
+                }
+                "msg" -> {
+                    val argString = if (trimmed.length > 3) trimmed.substring(3).trim() else ""
+                    val args = if (argString.contains("|")) argString.split("|").map { it.trim() } else listOf(argString)
+                    
+                    if (args.size < 2 || args[0].isBlank()) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: формат: msg <email> | <text>", "error")
+                    } else {
+                        val recipient = args[0]
+                        val txt = args[1]
+                        sendChatMessage(recipient, txt)
+                        _cliLogs.value = _cliLogs.value + CliLog("Успешно: подготовлен и транслирован P2P пакет к $recipient.", "success")
+                    }
+                }
+                "sync" -> {
+                    triggerSync()
+                    _cliLogs.value = _cliLogs.value + CliLog("Консоль: Инициализирован сетевой опрос...", "info")
+                }
+                "simulation" -> {
+                    if (parts.size < 2) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: укажите on/off", "error")
+                    } else {
+                        val opt = parts[1].lowercase()
+                        val isEnabled = opt == "on" || opt == "да" || opt == "1"
+                        setSimulationEnabled(isEnabled)
+                        _cliLogs.value = _cliLogs.value + CliLog("Сеть: Симуляция установлена в [${if (isEnabled) "ВКЛ" else "ВЫКЛ"}].", "success")
+                    }
+                }
+                "mailconfig" -> {
+                    if (parts.size < 8) {
+                        _cliLogs.value = _cliLogs.value + CliLog("Ошибка: укажите все 7 параметров:\nmailconfig <smtp> <port> <imap> <port> <user> <pass> <ssl>", "error")
+                    } else {
+                        val smtpH = parts[1]
+                        val smtpP = parts[2].toIntOrNull() ?: 465
+                        val imapH = parts[3]
+                        val imapP = parts[4].toIntOrNull() ?: 993
+                        val usr = parts[5]
+                        val pas = parts[6]
+                        val ssl = parts[7].toBoolean()
+                        updateMailSettings(smtpH, smtpP, imapH, imapP, usr, pas, ssl)
+                        _cliLogs.value = _cliLogs.value + CliLog("Кондоп: Конфигурация узла $usr зафиксирована.", "success")
+                    }
+                }
+                else -> {
+                    _cliLogs.value = _cliLogs.value + CliLog("Ошибка: Неподдерживаемая директива '$cmd'. Введите 'help' для полного списка.", "error")
+                }
+            }
+        } catch (e: Exception) {
+            _cliLogs.value = _cliLogs.value + CliLog("Исключение: ${e.message}", "error")
+        }
+    }
 }

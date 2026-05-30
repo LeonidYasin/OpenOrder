@@ -9,6 +9,10 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -98,9 +102,11 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
     val currentAgent = agents.find { it.id == currentAgentId }
     val currentFork = forks.find { it.id == selectedForkId }
 
-    var isConsoleVisible by remember { mutableStateOf(false) }
+    var isConsoleVisible by remember { mutableStateOf(true) } // Enable console by default so the user immediately sees the beautiful CLI Chat!
     var isLeftDrawerOpen by remember { mutableStateOf(false) }
     var isRightDrawerOpen by remember { mutableStateOf(false) }
+    var consoleViewMode by remember { mutableStateOf("split") } // "split", "full"
+    var cliInputText by remember { mutableStateOf("") }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -261,35 +267,223 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
                 .padding(innerPadding)
                 .padding(horizontal = 12.dp)
         ) {
-            // Real-Time System Command Console (Collapsible with Animation)
+            // Real-Time System Command Console / CLI Chat (Collapsible with Animation)
             AnimatedVisibility(
                 visible = isConsoleVisible,
+                modifier = if (consoleViewMode == "full") Modifier.weight(1f) else Modifier,
                 enter = expandVertically() + fadeIn(),
                 exit = shrinkVertically() + fadeOut()
             ) {
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(80.dp)
+                        .then(if (consoleViewMode == "full") Modifier.fillMaxHeight() else Modifier.height(260.dp))
                         .padding(bottom = 6.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Black),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, AccentTeal.copy(0.3f))
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF020617)), // Cyber Slate Black
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.5.dp, AccentTeal.copy(0.4f))
                 ) {
-                    LazyColumn(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        reverseLayout = true
-                    ) {
-                        item {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        // Terminal Header Bar
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F172A))
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color(0xFFEF4444), shape = RoundedCornerShape(5.dp))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color(0xFFF59E0B), shape = RoundedCornerShape(5.dp))
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .size(10.dp)
+                                        .background(Color(0xFF10B981), shape = RoundedCornerShape(5.dp))
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "ORDEN-P2P NETWORK CLI",
+                                    color = Color(0xFF94A3B8),
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // Full Screen Mode Button
+                                IconButton(
+                                    onClick = { 
+                                        consoleViewMode = if (consoleViewMode == "full") "split" else "full"
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (consoleViewMode == "full") Icons.Default.Close else Icons.Default.Share,
+                                        contentDescription = "Toggle Height",
+                                        tint = AccentTeal,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.width(8.dp))
+                                
+                                // Close Button
+                                IconButton(
+                                    onClick = { isConsoleVisible = false },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close Terminal",
+                                        tint = AlertRed,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Suggestion Pills / Commands Quick-clique
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF090D16))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            val suggestionChips = listOf("help", "status", "sync", "proposal", "dispute", "fork")
+                            suggestionChips.forEach { chipCmd ->
+                                Box(
+                                    modifier = Modifier
+                                        .background(Color(0xFF1E293B), shape = RoundedCornerShape(4.dp))
+                                        .border(0.5.dp, AccentTeal.copy(0.3f), RoundedCornerShape(4.dp))
+                                        .clickable {
+                                            if (chipCmd == "help" || chipCmd == "status" || chipCmd == "sync") {
+                                                viewModel.executeCliCommand(chipCmd)
+                                            } else {
+                                                cliInputText = "$chipCmd "
+                                            }
+                                        }
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = chipCmd,
+                                        color = SoftCyan,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                        }
+
+                        // Scrollable logs area
+                        val cliLogs by viewModel.cliLogs.collectAsState()
+                        val scrollState = rememberLazyListState()
+                        LaunchedEffect(cliLogs.size) {
+                            if (cliLogs.isNotEmpty()) {
+                                try {
+                                    scrollState.animateScrollToItem(cliLogs.size - 1)
+                                } catch (e: Exception) {
+                                    // Protect against unattached scroll state on quick mounting/animation
+                                }
+                            }
+                        }
+                        
+                        LazyColumn(
+                            state = scrollState,
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            items(cliLogs) { log ->
+                                val logColor = when (log.type) {
+                                    "command" -> SoftCyan
+                                    "success" -> CyberGreen
+                                    "error" -> Color(0xFFF87171)
+                                    "help" -> HighContrastGold
+                                    else -> Color.White
+                                }
+                                Text(
+                                    text = log.text,
+                                    color = logColor,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    modifier = Modifier.padding(vertical = 2.dp)
+                                )
+                            }
+                        }
+                        
+                        // Input Area
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF0F172A))
+                                .padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = consoleOutput,
-                                color = CyberGreen,
+                                text = "peer@social-os:~$ ",
+                                color = AccentTeal,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp,
-                                lineHeight = 14.sp
+                                fontWeight = FontWeight.Bold
                             )
+                            
+                            BasicTextField(
+                                value = cliInputText,
+                                onValueChange = { cliInputText = it },
+                                textStyle = androidx.compose.ui.text.TextStyle(
+                                    color = Color.White,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 12.sp
+                                ),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(AccentTeal),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                                    .testTag("cli_text_input"),
+                                keyboardOptions = KeyboardOptions(
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Send
+                                ),
+                                keyboardActions = KeyboardActions(
+                                    onSend = {
+                                        if (cliInputText.isNotBlank()) {
+                                            viewModel.executeCliCommand(cliInputText)
+                                            cliInputText = ""
+                                        }
+                                    }
+                                )
+                            )
+                            
+                            IconButton(
+                                onClick = {
+                                    if (cliInputText.isNotBlank()) {
+                                        viewModel.executeCliCommand(cliInputText)
+                                        cliInputText = ""
+                                    }
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Send,
+                                    contentDescription = "Send Directives",
+                                    tint = AccentTeal,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -298,14 +492,18 @@ fun OpenOrderSocialOSApp(viewModel: SuiteViewModel) {
             Spacer(modifier = Modifier.height(4.dp))
 
             // Tab Content
-            Box(modifier = Modifier.weight(1f)) {
-                when (activeTab) {
-                    0 -> MindMapTab(viewModel) { destination -> activeTab = destination }
-                    1 -> ArchitectureTab(viewModel) { activeTab = 0 }
-                    2 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId) { activeTab = 0 }
-                    3 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId) { activeTab = 0 }
-                    4 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents) { activeTab = 0 }
-                    else -> MindMapTab(viewModel) { destination -> activeTab = destination }
+            if (isConsoleVisible && consoleViewMode == "full") {
+                // In full screen mode, save screen landscape layout by collapsing bottom space 
+            } else {
+                Box(modifier = Modifier.weight(1f)) {
+                    when (activeTab) {
+                        0 -> MindMapTab(viewModel) { destination -> activeTab = destination }
+                        1 -> ArchitectureTab(viewModel) { activeTab = 0 }
+                        2 -> CouncilAndTasksTab(viewModel, proposals, tasks, currentAgentId, selectedForkId) { activeTab = 0 }
+                        3 -> JudiciaryTab(viewModel, disputes, agents, currentAgentId) { activeTab = 0 }
+                        4 -> RepositoryForksTab(viewModel, forks, syncLogs, selectedForkId, agents) { activeTab = 0 }
+                        else -> MindMapTab(viewModel) { destination -> activeTab = destination }
+                    }
                 }
             }
 
